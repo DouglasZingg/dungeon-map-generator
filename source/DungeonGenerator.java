@@ -20,6 +20,7 @@ public class DungeonGenerator {
     public void generate() {
         fillMapWithWalls();
         placeRooms(12);
+        connectRooms();
     }
 
     private void fillMapWithWalls() {
@@ -62,6 +63,45 @@ public class DungeonGenerator {
             for (int x = room.x; x < room.x + room.width; x++) {
                 map[y][x] = TileType.FLOOR;
             }
+        }
+    }
+
+    private void connectRooms() {
+        for (int i = 1; i < rooms.size(); i++) {
+            Room previousRoom = rooms.get(i - 1);
+            Room currentRoom = rooms.get(i);
+
+            int previousX = previousRoom.centerX();
+            int previousY = previousRoom.centerY();
+
+            int currentX = currentRoom.centerX();
+            int currentY = currentRoom.centerY();
+
+            if (random.nextBoolean()) {
+                carveHorizontalHallway(previousX, currentX, previousY);
+                carveVerticalHallway(previousY, currentY, currentX);
+            } else {
+                carveVerticalHallway(previousY, currentY, previousX);
+                carveHorizontalHallway(previousX, currentX, currentY);
+            }
+        }
+    }
+
+    private void carveHorizontalHallway(int startX, int endX, int y) {
+        int minX = Math.min(startX, endX);
+        int maxX = Math.max(startX, endX);
+
+        for (int x = minX; x <= maxX; x++) {
+            map[y][x] = TileType.FLOOR;
+        }
+    }
+
+    private void carveVerticalHallway(int startY, int endY, int x) {
+        int minY = Math.min(startY, endY);
+        int maxY = Math.max(startY, endY);
+
+        for (int y = minY; y <= maxY; y++) {
+            map[y][x] = TileType.FLOOR;
         }
     }
 
