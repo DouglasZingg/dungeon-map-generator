@@ -21,6 +21,7 @@ public class DungeonGenerator {
         fillMapWithWalls();
         placeRooms(12);
         connectRooms();
+        placeDoors();
     }
 
     private void fillMapWithWalls() {
@@ -92,7 +93,7 @@ public class DungeonGenerator {
         int maxX = Math.max(startX, endX);
 
         for (int x = minX; x <= maxX; x++) {
-            map[y][x] = TileType.FLOOR;
+            carveHallwayTile(x, y);
         }
     }
 
@@ -101,8 +102,41 @@ public class DungeonGenerator {
         int maxY = Math.max(startY, endY);
 
         for (int y = minY; y <= maxY; y++) {
+            carveHallwayTile(x, y);
+        }
+    }
+
+    private void carveHallwayTile(int x, int y) {
+        if (map[y][x] == TileType.WALL) {
             map[y][x] = TileType.FLOOR;
         }
+    }
+
+    private void placeDoors() {
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                if (map[y][x] == TileType.FLOOR && shouldPlaceDoor(x, y)) {
+                    map[y][x] = TileType.DOOR;
+                }
+            }
+        }
+    }
+
+    private boolean shouldPlaceDoor(int x, int y) {
+        boolean floorLeft = map[y][x - 1] == TileType.FLOOR;
+        boolean floorRight = map[y][x + 1] == TileType.FLOOR;
+        boolean floorUp = map[y - 1][x] == TileType.FLOOR;
+        boolean floorDown = map[y + 1][x] == TileType.FLOOR;
+
+        boolean wallLeft = map[y][x - 1] == TileType.WALL;
+        boolean wallRight = map[y][x + 1] == TileType.WALL;
+        boolean wallUp = map[y - 1][x] == TileType.WALL;
+        boolean wallDown = map[y + 1][x] == TileType.WALL;
+
+        boolean horizontalDoor = floorLeft && floorRight && wallUp && wallDown;
+        boolean verticalDoor = floorUp && floorDown && wallLeft && wallRight;
+
+        return horizontalDoor || verticalDoor;
     }
 
     public void printMap() {
