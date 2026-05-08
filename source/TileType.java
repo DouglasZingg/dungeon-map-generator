@@ -1,7 +1,9 @@
 public enum TileType {
     WALL('#'),
     FLOOR('.'),
-    DOOR('+');
+    DOOR('+'),
+    PLAYER('@'),
+    EXIT('>');
 
     private final char symbol;
 

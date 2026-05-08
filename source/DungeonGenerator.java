@@ -22,6 +22,7 @@ public class DungeonGenerator {
         placeRooms(12);
         connectRooms();
         placeDoors();
+        placePlayerAndExit();
     }
 
     private void fillMapWithWalls() {
@@ -137,6 +138,18 @@ public class DungeonGenerator {
         boolean verticalDoor = floorUp && floorDown && wallLeft && wallRight;
 
         return horizontalDoor || verticalDoor;
+    }
+
+    private void placePlayerAndExit() {
+        if (rooms.isEmpty()) {
+            return;
+        }
+
+        Room startRoom = rooms.get(0);
+        Room exitRoom = rooms.get(rooms.size() - 1);
+
+        map[startRoom.centerY()][startRoom.centerX()] = TileType.PLAYER;
+        map[exitRoom.centerY()][exitRoom.centerX()] = TileType.EXIT;
     }
 
     public void printMap() {
