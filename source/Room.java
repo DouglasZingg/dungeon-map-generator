@@ -3,6 +3,7 @@ public class Room {
     public int y;
     public int width;
     public int height;
+    public RoomType type = RoomType.COMBAT;
 
     public Room(int x, int y, int width, int height) {
         this.x = x;

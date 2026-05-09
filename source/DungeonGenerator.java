@@ -20,9 +20,11 @@ public class DungeonGenerator {
     public void generate() {
         fillMapWithWalls();
         placeRooms(12);
+        assignRoomTypes();
         connectRooms();
         placeDoors();
         placePlayerAndExit();
+        populateRooms();
     }
 
     private void fillMapWithWalls() {
@@ -114,30 +116,51 @@ public class DungeonGenerator {
     }
 
     private void placeDoors() {
-        for (int y = 1; y < height - 1; y++) {
-            for (int x = 1; x < width - 1; x++) {
-                if (map[y][x] == TileType.FLOOR && shouldPlaceDoor(x, y)) {
-                    map[y][x] = TileType.DOOR;
-                }
-            }
+        for (Room room : rooms) {
+            placeRoomDoors(room);
         }
     }
 
-    private boolean shouldPlaceDoor(int x, int y) {
-        boolean floorLeft = map[y][x - 1] == TileType.FLOOR;
-        boolean floorRight = map[y][x + 1] == TileType.FLOOR;
-        boolean floorUp = map[y - 1][x] == TileType.FLOOR;
-        boolean floorDown = map[y + 1][x] == TileType.FLOOR;
+    private void placeRoomDoors(Room room) {
+        // Top and bottom walls
+        for (int x = room.x; x < room.x + room.width; x++) {
+            tryPlaceDoor(x, room.y - 1);
+            tryPlaceDoor(x, room.y + room.height);
+        }
 
-        boolean wallLeft = map[y][x - 1] == TileType.WALL;
-        boolean wallRight = map[y][x + 1] == TileType.WALL;
-        boolean wallUp = map[y - 1][x] == TileType.WALL;
-        boolean wallDown = map[y + 1][x] == TileType.WALL;
+        // Left and right walls
+        for (int y = room.y; y < room.y + room.height; y++) {
+            tryPlaceDoor(room.x - 1, y);
+            tryPlaceDoor(room.x + room.width, y);
+        }
+    }
 
-        boolean horizontalDoor = floorLeft && floorRight && wallUp && wallDown;
-        boolean verticalDoor = floorUp && floorDown && wallLeft && wallRight;
+    private void tryPlaceDoor(int x, int y) {
+        if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) {
+            return;
+        }
 
-        return horizontalDoor || verticalDoor;
+        if (map[y][x] != TileType.FLOOR) {
+            return;
+        }
+
+        if (hasNearbyDoor(x, y)) {
+            return;
+        }
+
+        map[y][x] = TileType.DOOR;
+    }
+
+    private boolean hasNearbyDoor(int x, int y) {
+        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
+            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
+                if (map[checkY][checkX] == TileType.DOOR) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void placePlayerAndExit() {
@@ -150,6 +173,48 @@ public class DungeonGenerator {
 
         map[startRoom.centerY()][startRoom.centerX()] = TileType.PLAYER;
         map[exitRoom.centerY()][exitRoom.centerX()] = TileType.EXIT;
+    }
+
+    private void assignRoomTypes() {
+        if (rooms.isEmpty()) {
+            return;
+        }
+
+        rooms.get(0).type = RoomType.START;
+        rooms.get(rooms.size() - 1).type = RoomType.EXIT;
+
+        for (int i = 1; i < rooms.size() - 1; i++) {
+            int roll = random.nextInt(100);
+
+            if (roll < 60) {
+                rooms.get(i).type = RoomType.COMBAT;
+            } else if (roll < 85) {
+                rooms.get(i).type = RoomType.TREASURE;
+            } else {
+                rooms.get(i).type = RoomType.TRAP;
+            }
+        }
+    }
+
+    private void populateRooms() {
+        for (Room room : rooms) {
+            if (room.type == RoomType.COMBAT) {
+                placeRandomTileInRoom(room, TileType.ENEMY);
+            } else if (room.type == RoomType.TREASURE) {
+                placeRandomTileInRoom(room, TileType.TREASURE);
+            } else if (room.type == RoomType.TRAP) {
+                placeRandomTileInRoom(room, TileType.TRAP);
+            }
+        }
+    }
+
+    private void placeRandomTileInRoom(Room room, TileType tile) {
+        int x = random.nextInt(room.width - 2) + room.x + 1;
+        int y = random.nextInt(room.height - 2) + room.y + 1;
+
+        if (map[y][x] == TileType.FLOOR) {
+            map[y][x] = tile;
+        }
     }
 
     public void printMap() {

@@ -3,7 +3,10 @@ public enum TileType {
     FLOOR('.'),
     DOOR('+'),
     PLAYER('@'),
-    EXIT('>');
+    EXIT('>'),
+    ENEMY('E'),
+    TREASURE('$'),
+    TRAP('^');
 
     private final char symbol;
 
