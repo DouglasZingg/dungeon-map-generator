@@ -3,5 +3,6 @@ public enum RoomType {
     COMBAT,
     TREASURE,
     TRAP,
+    BOSS,
     EXIT
 }

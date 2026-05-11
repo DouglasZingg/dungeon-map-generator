@@ -6,7 +6,8 @@ public enum TileType {
     EXIT('>'),
     ENEMY('E'),
     TREASURE('$'),
-    TRAP('^');
+    TRAP('^'),
+    BOSS('B');
 
     private final char symbol;
 

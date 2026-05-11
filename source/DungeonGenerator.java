@@ -175,45 +175,44 @@ public class DungeonGenerator {
         map[exitRoom.centerY()][exitRoom.centerX()] = TileType.EXIT;
     }
 
-    private void assignRoomTypes() {
-        if (rooms.isEmpty()) {
-            return;
-        }
-
-        rooms.get(0).type = RoomType.START;
-        rooms.get(rooms.size() - 1).type = RoomType.EXIT;
-
-        for (int i = 1; i < rooms.size() - 1; i++) {
-            int roll = random.nextInt(100);
-
-            if (roll < 60) {
-                rooms.get(i).type = RoomType.COMBAT;
-            } else if (roll < 85) {
-                rooms.get(i).type = RoomType.TREASURE;
-            } else {
-                rooms.get(i).type = RoomType.TRAP;
-            }
-        }
-    }
-
     private void populateRooms() {
         for (Room room : rooms) {
             if (room.type == RoomType.COMBAT) {
-                placeRandomTileInRoom(room, TileType.ENEMY);
+                int enemyCount = random.nextInt(3) + 1; // 1 to 3 enemies
+
+                for (int i = 0; i < enemyCount; i++) {
+                    placeRandomTileInRoom(room, TileType.ENEMY);
+                }
+
             } else if (room.type == RoomType.TREASURE) {
                 placeRandomTileInRoom(room, TileType.TREASURE);
+
+                if (random.nextBoolean()) {
+                    placeRandomTileInRoom(room, TileType.TREASURE);
+                }
+
             } else if (room.type == RoomType.TRAP) {
-                placeRandomTileInRoom(room, TileType.TRAP);
+                int trapCount = random.nextInt(3) + 1; // 1 to 3 traps
+
+                for (int i = 0; i < trapCount; i++) {
+                    placeRandomTileInRoom(room, TileType.TRAP);
+                }
+            }else if (room.type == RoomType.BOSS) {
+                placeRandomTileInRoom(room, TileType.BOSS);
+                placeRandomTileInRoom(room, TileType.TREASURE);
             }
         }
     }
 
     private void placeRandomTileInRoom(Room room, TileType tile) {
-        int x = random.nextInt(room.width - 2) + room.x + 1;
-        int y = random.nextInt(room.height - 2) + room.y + 1;
+        for (int attempt = 0; attempt < 20; attempt++) {
+            int x = random.nextInt(room.width - 2) + room.x + 1;
+            int y = random.nextInt(room.height - 2) + room.y + 1;
 
-        if (map[y][x] == TileType.FLOOR) {
-            map[y][x] = tile;
+            if (map[y][x] == TileType.FLOOR) {
+                map[y][x] = tile;
+                return;
+            }
         }
     }
 
