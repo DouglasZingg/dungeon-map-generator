@@ -8,18 +8,34 @@ public class DungeonGenerator {
     private final TileType[][] map;
     private final List<Room> rooms;
     private final Random random;
+    private final DungeonSettings settings;
 
-    public DungeonGenerator(int width, int height) {
+    public DungeonGenerator(int width, int height, DungeonSettings settings) {
         this.width = width;
         this.height = height;
+        this.settings = settings;
         this.map = new TileType[height][width];
-        this.rooms = new ArrayList <> ();
+        this.rooms = new ArrayList<>();
         this.random = new Random();
+    }
+
+    public void printLegend() {
+        System.out.println();
+        System.out.println("Legend:");
+        System.out.println("# = Wall");
+        System.out.println(". = Floor");
+        System.out.println("+ = Door");
+        System.out.println("@ = Player Start");
+        System.out.println("> = Exit");
+        System.out.println("E = Enemy");
+        System.out.println("$ = Treasure");
+        System.out.println("^ = Trap");
+        System.out.println("B = Boss");
     }
 
     public void generate() {
         fillMapWithWalls();
-        placeRooms(12);
+        placeRooms(settings.maxRooms);
         assignRoomTypes();
         connectRooms();
         placeDoors();
@@ -212,6 +228,31 @@ public class DungeonGenerator {
             if (map[y][x] == TileType.FLOOR) {
                 map[y][x] = tile;
                 return;
+            }
+        }
+    }
+
+    private void assignRoomTypes() {
+        if (rooms.isEmpty()) {
+            return;
+        }
+
+        rooms.get(0).type = RoomType.START;
+        rooms.get(rooms.size() - 1).type = RoomType.EXIT;
+
+        if (rooms.size() > 2) {
+            rooms.get(rooms.size() - 2).type = RoomType.BOSS;
+        }
+
+        for (int i = 1; i < rooms.size() - 2; i++) {
+            int roll = random.nextInt(100);
+
+            if (roll < 60) {
+                rooms.get(i).type = RoomType.COMBAT;
+            } else if (roll < 85) {
+                rooms.get(i).type = RoomType.TREASURE;
+            } else {
+                rooms.get(i).type = RoomType.TRAP;
             }
         }
     }
