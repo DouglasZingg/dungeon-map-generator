@@ -53,8 +53,11 @@ public class DungeonGenerator {
 
     private void placeRooms(int maxRooms) {
         for (int i = 0; i < maxRooms; i++) {
-            int roomWidth = random.nextInt(6) + 4;
-            int roomHeight = random.nextInt(5) + 4;
+            int roomWidth = random.nextInt(settings.maxRoomWidth - settings.minRoomWidth + 1)
+                    + settings.minRoomWidth;
+
+            int roomHeight = random.nextInt(settings.maxRoomHeight - settings.minRoomHeight + 1)
+                    + settings.minRoomHeight;
 
             int x = random.nextInt(width - roomWidth - 2) + 1;
             int y = random.nextInt(height - roomHeight - 2) + 1;
@@ -194,7 +197,7 @@ public class DungeonGenerator {
     private void populateRooms() {
         for (Room room : rooms) {
             if (room.type == RoomType.COMBAT) {
-                int enemyCount = random.nextInt(3) + 1; // 1 to 3 enemies
+                int enemyCount = random.nextInt(settings.maxEnemiesPerCombatRoom - settings.minEnemiesPerCombatRoom + 1) + settings.minEnemiesPerCombatRoom;
 
                 for (int i = 0; i < enemyCount; i++) {
                     placeRandomTileInRoom(room, TileType.ENEMY);
@@ -208,7 +211,7 @@ public class DungeonGenerator {
                 }
 
             } else if (room.type == RoomType.TRAP) {
-                int trapCount = random.nextInt(3) + 1; // 1 to 3 traps
+                int trapCount = random.nextInt(settings.maxTrapsPerTrapRoom - settings.minTrapsPerTrapRoom + 1) + settings.minTrapsPerTrapRoom;
 
                 for (int i = 0; i < trapCount; i++) {
                     placeRandomTileInRoom(room, TileType.TRAP);
