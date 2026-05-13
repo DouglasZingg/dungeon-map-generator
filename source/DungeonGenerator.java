@@ -115,7 +115,8 @@ public class DungeonGenerator {
         int maxX = Math.max(startX, endX);
 
         for (int x = minX; x <= maxX; x++) {
-            carveHallwayTile(x, y);
+            carveFloor(x, y);
+            carveFloor(x, y + 1);
         }
     }
 
@@ -124,14 +125,17 @@ public class DungeonGenerator {
         int maxY = Math.max(startY, endY);
 
         for (int y = minY; y <= maxY; y++) {
-            carveHallwayTile(x, y);
+            carveFloor(x, y);
+            carveFloor(x + 1, y);
         }
     }
 
-    private void carveHallwayTile(int x, int y) {
-        if (map[y][x] == TileType.WALL) {
-            map[y][x] = TileType.FLOOR;
+    private void carveFloor(int x, int y) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            return;
         }
+
+        map[y][x] = TileType.FLOOR;
     }
 
     private void placeDoors() {
