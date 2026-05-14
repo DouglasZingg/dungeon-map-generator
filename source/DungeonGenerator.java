@@ -31,6 +31,8 @@ public class DungeonGenerator {
         System.out.println("$ = Treasure");
         System.out.println("^ = Trap");
         System.out.println("B = Boss");
+        System.out.println("L = Locked Door");
+        System.out.println("K = Key");
     }
 
     public void generate() {
@@ -39,6 +41,8 @@ public class DungeonGenerator {
         assignRoomTypes();
         connectRooms();
         placeDoors();
+        placeLockedDoorAndKey();
+        placeLockedDoorAndKey();
         placePlayerAndExit();
         populateRooms();
     }
@@ -142,6 +146,41 @@ public class DungeonGenerator {
         for (Room room : rooms) {
             placeRoomDoors(room);
         }
+    }
+
+    private void placeLockedDoorAndKey() {
+        if (rooms.size() < 4) {
+            return;
+        }
+
+        Room bossRoom = rooms.get(rooms.size() - 2);
+
+        // Try to turn one normal door near the boss room into a locked door
+        for (int y = bossRoom.y - 1; y <= bossRoom.y + bossRoom.height; y++) {
+            for (int x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.width; x++) {
+                if (x < 0 || x >= width || y < 0 || y >= height) {
+                    continue;
+                }
+
+                if (map[y][x] == TileType.DOOR) {
+                    map[y][x] = TileType.LOCKED_DOOR;
+                    placeKey();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void placeKey() {
+        if (rooms.size() < 3) {
+            return;
+        }
+
+        // Put the key somewhere before the boss room
+        int maxRoomIndex = Math.max(1, rooms.size() - 3);
+        Room keyRoom = rooms.get(random.nextInt(maxRoomIndex) + 1);
+
+        placeRandomTileInRoom(keyRoom, TileType.KEY);
     }
 
     private void placeRoomDoors(Room room) {
