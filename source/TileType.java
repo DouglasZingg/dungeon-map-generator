@@ -9,7 +9,8 @@ public enum TileType {
     TREASURE('$'),
     TRAP('^'),
     BOSS('B'),
-    KEY('K');
+    KEY('K'),
+    POTION('!');
 
     private final char symbol;
 

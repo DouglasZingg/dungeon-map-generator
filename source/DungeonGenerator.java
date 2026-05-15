@@ -33,6 +33,7 @@ public class DungeonGenerator {
         System.out.println("B = Boss");
         System.out.println("L = Locked Door");
         System.out.println("K = Key");
+        System.out.println("! = Potion");
     }
 
     public void generate() {
@@ -246,13 +247,22 @@ public class DungeonGenerator {
                     placeRandomTileInRoom(room, TileType.ENEMY);
                 }
 
+                if (random.nextInt(100) < 25) {
+                    placeRandomTileInRoom(room, TileType.POTION);
+                }
+
             } else if (room.type == RoomType.TREASURE) {
                 placeRandomTileInRoom(room, TileType.TREASURE);
 
                 if (random.nextBoolean()) {
                     placeRandomTileInRoom(room, TileType.TREASURE);
-                }
+                }else if (room.type == RoomType.TREASURE) {
+                    placeRandomTileInRoom(room, TileType.TREASURE);
 
+                    if (random.nextBoolean()) {
+                        placeRandomTileInRoom(room, TileType.POTION);
+                    }
+                }
             } else if (room.type == RoomType.TRAP) {
                 int trapCount = random.nextInt(settings.maxTrapsPerTrapRoom - settings.minTrapsPerTrapRoom + 1) + settings.minTrapsPerTrapRoom;
 
@@ -263,6 +273,7 @@ public class DungeonGenerator {
                 placeRandomTileInRoom(room, TileType.BOSS);
                 placeRandomTileInRoom(room, TileType.TREASURE);
             }
+
         }
     }
 
