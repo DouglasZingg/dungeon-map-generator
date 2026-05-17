@@ -12,4 +12,6 @@ public class DungeonSettings {
 
     public int minTrapsPerTrapRoom = 1;
     public int maxTrapsPerTrapRoom = 3;
+
+    public long seed = System.currentTimeMillis();
 }

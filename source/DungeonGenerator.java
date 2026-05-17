@@ -16,7 +16,7 @@ public class DungeonGenerator {
         this.settings = settings;
         this.map = new TileType[height][width];
         this.rooms = new ArrayList<>();
-        this.random = new Random();
+        this.random = new Random(settings.seed);
     }
 
     public void printLegend() {
