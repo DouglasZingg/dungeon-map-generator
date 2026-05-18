@@ -4,5 +4,6 @@ public enum RoomType {
     TREASURE,
     TRAP,
     BOSS,
+    SECRET,
     EXIT
 }

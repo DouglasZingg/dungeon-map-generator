@@ -51,6 +51,41 @@ public class DungeonGenerator {
         populateRooms();
     }
 
+    public void printSummary() {
+        int enemies = countTiles(TileType.ENEMY);
+        int treasures = countTiles(TileType.TREASURE);
+        int traps = countTiles(TileType.TRAP);
+        int potions = countTiles(TileType.POTION);
+        int doors = countTiles(TileType.DOOR);
+        int lockedDoors = countTiles(TileType.LOCKED_DOOR);
+        int secretDoors = countTiles(TileType.SECRET_DOOR);
+
+        System.out.println();
+        System.out.println("Dungeon Summary:");
+        System.out.println("Rooms: " + rooms.size());
+        System.out.println("Enemies: " + enemies);
+        System.out.println("Treasures: " + treasures);
+        System.out.println("Traps: " + traps);
+        System.out.println("Potions: " + potions);
+        System.out.println("Doors: " + doors);
+        System.out.println("Locked Doors: " + lockedDoors);
+        System.out.println("Secret Doors: " + secretDoors);
+    }
+
+    private int countTiles(TileType tileType) {
+        int count = 0;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (map[y][x] == tileType) {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
     private void fillMapWithWalls() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
