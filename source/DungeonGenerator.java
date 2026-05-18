@@ -34,15 +34,18 @@ public class DungeonGenerator {
         System.out.println("L = Locked Door");
         System.out.println("K = Key");
         System.out.println("! = Potion");
+        System.out.println("? = Secret Door");
     }
 
     public void generate() {
         fillMapWithWalls();
         placeRooms(settings.maxRooms);
+
+        createSecretRoom();
+
         assignRoomTypes();
         connectRooms();
         placeDoors();
-        placeLockedDoorAndKey();
         placeLockedDoorAndKey();
         placePlayerAndExit();
         populateRooms();
@@ -272,6 +275,11 @@ public class DungeonGenerator {
             }else if (room.type == RoomType.BOSS) {
                 placeRandomTileInRoom(room, TileType.BOSS);
                 placeRandomTileInRoom(room, TileType.TREASURE);
+            }else if (room.type == RoomType.SECRET) {
+
+                placeRandomTileInRoom(room, TileType.TREASURE);
+                placeRandomTileInRoom(room, TileType.TREASURE);
+                placeRandomTileInRoom(room, TileType.POTION);
             }
 
         }
@@ -312,6 +320,87 @@ public class DungeonGenerator {
                 rooms.get(i).type = RoomType.TRAP;
             }
         }
+    }
+
+    private void createSecretRoom() {
+        int roomWidth = 5;
+        int roomHeight = 5;
+
+        for (int attempt = 0; attempt < 50; attempt++) {
+
+            int x = random.nextInt(width - roomWidth - 2) + 1;
+            int y = random.nextInt(height - roomHeight - 2) + 1;
+
+            Room secretRoom = new Room(x, y, roomWidth, roomHeight);
+
+            if (!doesRoomOverlap(secretRoom)) {
+
+                carveRoom(secretRoom);
+
+                secretRoom.type = RoomType.SECRET;
+
+                rooms.add(secretRoom);
+
+                connectSecretRoom(secretRoom);
+
+                return;
+            }
+        }
+    }
+
+    private void connectSecretRoom(Room secretRoom) {
+
+        Room nearestRoom = rooms.get(0);
+
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (Room room : rooms) {
+
+            if (room == secretRoom) {
+                continue;
+            }
+
+            double dx = room.centerX() - secretRoom.centerX();
+            double dy = room.centerY() - secretRoom.centerY();
+
+            double distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestRoom = room;
+            }
+        }
+
+        int x1 = secretRoom.centerX();
+        int y1 = secretRoom.centerY();
+
+        int x2 = nearestRoom.centerX();
+        int y2 = nearestRoom.centerY();
+
+        carveSecretHallway(x1, x2, y1);
+        carveSecretHallwayVertical(y1, y2, x2);
+
+        placeSecretDoorBetween(secretRoom, nearestRoom);
+    }
+
+    private void carveSecretHallway(int startX, int endX, int y) {
+        for (int x = Math.min(startX, endX); x <= Math.max(startX, endX); x++) {
+            carveFloor(x, y);
+        }
+    }
+
+    private void carveSecretHallwayVertical(int startY, int endY, int x) {
+        for (int y = Math.min(startY, endY); y <= Math.max(startY, endY); y++) {
+            carveFloor(x, y);
+        }
+    }
+
+    private void placeSecretDoorBetween(Room secretRoom, Room normalRoom) {
+
+        int doorX = normalRoom.centerX();
+        int doorY = normalRoom.centerY();
+
+        map[doorY][doorX] = TileType.SECRET_DOOR;
     }
 
     public void printMap() {
