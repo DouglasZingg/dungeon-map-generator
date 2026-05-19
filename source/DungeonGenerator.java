@@ -438,6 +438,70 @@ public class DungeonGenerator {
         map[doorY][doorX] = TileType.SECRET_DOOR;
     }
 
+    public boolean isExitReachable() {
+        int startX = -1;
+        int startY = -1;
+        int exitX = -1;
+        int exitY = -1;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (map[y][x] == TileType.PLAYER) {
+                    startX = x;
+                    startY = y;
+                } else if (map[y][x] == TileType.EXIT) {
+                    exitX = x;
+                    exitY = y;
+                }
+            }
+        }
+
+        if (startX == -1 || exitX == -1) {
+            return false;
+        }
+
+        boolean[][] visited = new boolean[height][width];
+        return floodFill(startX, startY, exitX, exitY, visited);
+    }
+
+    private boolean floodFill(int x, int y, int exitX, int exitY, boolean[][] visited) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            return false;
+        }
+
+        if (visited[y][x]) {
+            return false;
+        }
+
+        if (!isWalkable(map[y][x])) {
+            return false;
+        }
+
+        if (x == exitX && y == exitY) {
+            return true;
+        }
+
+        visited[y][x] = true;
+
+        return floodFill(x + 1, y, exitX, exitY, visited)
+                || floodFill(x - 1, y, exitX, exitY, visited)
+                || floodFill(x, y + 1, exitX, exitY, visited)
+                || floodFill(x, y - 1, exitX, exitY, visited);
+    }
+
+    private boolean isWalkable(TileType tile) {
+        return tile == TileType.FLOOR
+                || tile == TileType.DOOR
+                || tile == TileType.PLAYER
+                || tile == TileType.EXIT
+                || tile == TileType.ENEMY
+                || tile == TileType.TREASURE
+                || tile == TileType.TRAP
+                || tile == TileType.BOSS
+                || tile == TileType.KEY
+                || tile == TileType.POTION;
+    }
+
     public void printMap() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {

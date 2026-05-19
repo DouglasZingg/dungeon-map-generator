@@ -11,6 +11,9 @@ public class Main {
         dungeon.printSummary();
 
         System.out.println();
+        System.out.println("Exit reachable: " + dungeon.isExitReachable());
+
+        System.out.println();
         System.out.println("Seed: " + settings.seed);
     }
 }
