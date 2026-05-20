@@ -1,7 +1,7 @@
 public class Main {
     public static void main(String[] args) {
         DungeonSettings settings = new DungeonSettings();
-        settings.seed = 12345L;
+        settings.seed = System.currentTimeMillis();
 
         DungeonGenerator dungeon = new DungeonGenerator(60, 30, settings);
 

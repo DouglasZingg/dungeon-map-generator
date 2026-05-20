@@ -38,17 +38,25 @@ public class DungeonGenerator {
     }
 
     public void generate() {
-        fillMapWithWalls();
-        placeRooms(settings.maxRooms);
+        for (int attempt = 1; attempt <= settings.maxGenerationAttempts; attempt++) {
+            rooms.clear();
 
-        createSecretRoom();
+            fillMapWithWalls();
+            placeRooms(settings.maxRooms);
+            createSecretRoom();
+            assignRoomTypes();
+            connectRooms();
+            placeDoors();
+            placeLockedDoorAndKey();
+            placePlayerAndExit();
+            populateRooms();
 
-        assignRoomTypes();
-        connectRooms();
-        placeDoors();
-        placeLockedDoorAndKey();
-        placePlayerAndExit();
-        populateRooms();
+            if (isExitReachable()) {
+                return;
+            }
+        }
+
+        System.out.println("Warning: Could not generate a fully valid dungeon.");
     }
 
     public void printSummary() {
@@ -183,7 +191,11 @@ public class DungeonGenerator {
 
     private void placeDoors() {
         for (Room room : rooms) {
-            placeRoomDoors(room);
+            if (room.type == RoomType.SECRET) {
+                continue;
+            }
+
+            placeDoorsForRoom(room);
         }
     }
 
@@ -250,18 +262,6 @@ public class DungeonGenerator {
         }
 
         map[y][x] = TileType.DOOR;
-    }
-
-    private boolean hasNearbyDoor(int x, int y) {
-        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
-            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
-                if (map[checkY][checkX] == TileType.DOOR) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private void placePlayerAndExit() {
@@ -500,6 +500,99 @@ public class DungeonGenerator {
                 || tile == TileType.BOSS
                 || tile == TileType.KEY
                 || tile == TileType.POTION;
+    }
+
+    private void placeDoorsForRoom(Room room) {
+        // Top and bottom edges
+        for (int x = room.x; x < room.x + room.width; x++) {
+            tryPlaceDoorAtRoomEdge(x, room.y - 1, room);
+            tryPlaceDoorAtRoomEdge(x, room.y + room.height, room);
+        }
+
+        // Left and right edges
+        for (int y = room.y; y < room.y + room.height; y++) {
+            tryPlaceDoorAtRoomEdge(room.x - 1, y, room);
+            tryPlaceDoorAtRoomEdge(room.x + room.width, y, room);
+        }
+    }
+
+    private void tryPlaceDoorAtRoomEdge(int x, int y, Room room) {
+        if (!isInsideMap(x, y)) {
+            return;
+        }
+
+        if (map[y][x] != TileType.FLOOR) {
+            return;
+        }
+
+        if (!touchesRoomInterior(x, y, room)) {
+            return;
+        }
+
+        if (!touchesHallwayOutsideRoom(x, y, room)) {
+            return;
+        }
+
+        if (hasNearbyDoor(x, y)) {
+            return;
+        }
+
+        map[y][x] = TileType.DOOR;
+    }
+
+    private boolean touchesRoomInterior(int x, int y, Room room) {
+        return isInsideRoom(x + 1, y, room)
+                || isInsideRoom(x - 1, y, room)
+                || isInsideRoom(x, y + 1, room)
+                || isInsideRoom(x, y - 1, room);
+    }
+
+    private boolean touchesHallwayOutsideRoom(int x, int y, Room room) {
+        return isFloorOutsideRoom(x + 1, y, room)
+                || isFloorOutsideRoom(x - 1, y, room)
+                || isFloorOutsideRoom(x, y + 1, room)
+                || isFloorOutsideRoom(x, y - 1, room);
+    }
+
+    private boolean isFloorOutsideRoom(int x, int y, Room room) {
+        if (!isInsideMap(x, y)) {
+            return false;
+        }
+
+        if (isInsideRoom(x, y, room)) {
+            return false;
+        }
+
+        return map[y][x] == TileType.FLOOR;
+    }
+
+    private boolean isInsideRoom(int x, int y, Room room) {
+        return x >= room.x
+                && x < room.x + room.width
+                && y >= room.y
+                && y < room.y + room.height;
+    }
+
+    private boolean isInsideMap(int x, int y) {
+        return x >= 0 && x < width && y >= 0 && y < height;
+    }
+
+    private boolean hasNearbyDoor(int x, int y) {
+        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
+            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
+                if (!isInsideMap(checkX, checkY)) {
+                    continue;
+                }
+
+                if (map[checkY][checkX] == TileType.DOOR
+                        || map[checkY][checkX] == TileType.LOCKED_DOOR
+                        || map[checkY][checkX] == TileType.SECRET_DOOR) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public void printMap() {
