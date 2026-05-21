@@ -46,7 +46,9 @@ public class DungeonGenerator {
             createSecretRoom();
             assignRoomTypes();
             connectRooms();
-            placeDoors();
+
+            // placeDoors();  // no longer needed
+
             placeLockedDoorAndKey();
             placePlayerAndExit();
             populateRooms();
@@ -145,20 +147,46 @@ public class DungeonGenerator {
             Room previousRoom = rooms.get(i - 1);
             Room currentRoom = rooms.get(i);
 
-            int previousX = previousRoom.centerX();
-            int previousY = previousRoom.centerY();
+            int x1 = previousRoom.centerX();
+            int y1 = previousRoom.centerY();
 
-            int currentX = currentRoom.centerX();
-            int currentY = currentRoom.centerY();
+            int x2 = currentRoom.centerX();
+            int y2 = currentRoom.centerY();
 
             if (random.nextBoolean()) {
-                carveHorizontalHallway(previousX, currentX, previousY);
-                carveVerticalHallway(previousY, currentY, currentX);
+                carveHorizontalHallway(x1, x2, y1);
+                carveVerticalHallway(y1, y2, x2);
             } else {
-                carveVerticalHallway(previousY, currentY, previousX);
-                carveHorizontalHallway(previousX, currentX, currentY);
+                carveVerticalHallway(y1, y2, x1);
+                carveHorizontalHallway(x1, x2, y2);
+            }
+
+            placeDoorBetweenRooms(previousRoom, currentRoom);
+        }
+    }
+
+    private void placeDoorBetweenRooms(Room fromRoom, Room toRoom) {
+        int doorX = fromRoom.centerX();
+        int doorY = fromRoom.centerY();
+
+        int targetX = toRoom.centerX();
+        int targetY = toRoom.centerY();
+
+        if (Math.abs(targetX - doorX) > Math.abs(targetY - doorY)) {
+            if (targetX > doorX) {
+                doorX = fromRoom.x + fromRoom.width - 1;
+            } else {
+                doorX = fromRoom.x;
+            }
+        } else {
+            if (targetY > doorY) {
+                doorY = fromRoom.y + fromRoom.height - 1;
+            } else {
+                doorY = fromRoom.y;
             }
         }
+
+        map[doorY][doorX] = TileType.DOOR;
     }
 
     private void carveHorizontalHallway(int startX, int endX, int y) {
