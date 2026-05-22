@@ -162,6 +162,7 @@ public class DungeonGenerator {
             }
 
             placeDoorBetweenRooms(previousRoom, currentRoom);
+            placeDoorBetweenRooms(currentRoom, previousRoom);
         }
     }
 
@@ -234,10 +235,9 @@ public class DungeonGenerator {
 
         Room bossRoom = rooms.get(rooms.size() - 2);
 
-        // Try to turn one normal door near the boss room into a locked door
         for (int y = bossRoom.y - 1; y <= bossRoom.y + bossRoom.height; y++) {
             for (int x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.width; x++) {
-                if (x < 0 || x >= width || y < 0 || y >= height) {
+                if (!isInsideMap(x, y)) {
                     continue;
                 }
 
@@ -527,7 +527,8 @@ public class DungeonGenerator {
                 || tile == TileType.TRAP
                 || tile == TileType.BOSS
                 || tile == TileType.KEY
-                || tile == TileType.POTION;
+                || tile == TileType.POTION
+                || tile == TileType.LOCKED_DOOR;
     }
 
     private void placeDoorsForRoom(Room room) {
