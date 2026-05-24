@@ -372,16 +372,14 @@ public class DungeonGenerator {
             rooms.get(rooms.size() - 2).type = RoomType.BOSS;
         }
 
-        for (int i = 1; i < rooms.size() - 2; i++) {
-            int roll = random.nextInt(100);
+        int roll = random.nextInt(100);
 
-            if (roll < 60) {
-                rooms.get(i).type = RoomType.COMBAT;
-            } else if (roll < 85) {
-                rooms.get(i).type = RoomType.TREASURE;
-            } else {
-                rooms.get(i).type = RoomType.TRAP;
-            }
+        if (roll < settings.combatRoomChance) {
+            rooms.get(i).type = RoomType.COMBAT;
+        } else if (roll < settings.combatRoomChance + settings.treasureRoomChance) {
+            rooms.get(i).type = RoomType.TREASURE;
+        } else {
+            rooms.get(i).type = RoomType.TRAP;
         }
     }
 

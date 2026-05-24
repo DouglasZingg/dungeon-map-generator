@@ -16,4 +16,8 @@ public class DungeonSettings {
     public long seed = System.currentTimeMillis();
 
     public int maxGenerationAttempts = 25;
+
+    public int combatRoomChance = 60;
+    public int treasureRoomChance = 25;
+    public int trapRoomChance = 15;
 }
