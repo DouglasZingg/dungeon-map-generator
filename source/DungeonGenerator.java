@@ -372,14 +372,16 @@ public class DungeonGenerator {
             rooms.get(rooms.size() - 2).type = RoomType.BOSS;
         }
 
-        int roll = random.nextInt(100);
+        for (int i = 1; i < rooms.size() - 2; i++) {
+            int roll = random.nextInt(100);
 
-        if (roll < settings.combatRoomChance) {
-            rooms.get(i).type = RoomType.COMBAT;
-        } else if (roll < settings.combatRoomChance + settings.treasureRoomChance) {
-            rooms.get(i).type = RoomType.TREASURE;
-        } else {
-            rooms.get(i).type = RoomType.TRAP;
+            if (roll < settings.combatRoomChance) {
+                rooms.get(i).type = RoomType.COMBAT;
+            } else if (roll < settings.combatRoomChance + settings.treasureRoomChance) {
+                rooms.get(i).type = RoomType.TREASURE;
+            } else {
+                rooms.get(i).type = RoomType.TRAP;
+            }
         }
     }
 
@@ -620,6 +622,19 @@ public class DungeonGenerator {
         }
 
         return false;
+    }
+
+    public String getMapAsString() {
+        StringBuilder builder = new StringBuilder();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                builder.append(map[y][x].getSymbol());
+            }
+            builder.append("\n");
+        }
+
+        return builder.toString();
     }
 
     public void printMap() {
