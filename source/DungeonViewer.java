@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import javax.swing.event.ChangeListener;
 
 public class DungeonViewer extends JFrame {
     private final DungeonSettings settings;
@@ -40,6 +41,14 @@ public class DungeonViewer extends JFrame {
         controls.add(seedSpinner);
 
         JButton generateButton = new JButton("Generate Dungeon");
+
+        ChangeListener autoGenerate = e -> generateDungeon();
+
+        roomCountSpinner.addChangeListener(autoGenerate);
+        widthSpinner.addChangeListener(autoGenerate);
+        heightSpinner.addChangeListener(autoGenerate);
+        seedSpinner.addChangeListener(autoGenerate);
+
         generateButton.addActionListener(e -> generateDungeon());
 
         JPanel leftPanel = new JPanel(new BorderLayout());
