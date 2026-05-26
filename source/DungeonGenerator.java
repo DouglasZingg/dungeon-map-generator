@@ -637,6 +637,10 @@ public class DungeonGenerator {
         return builder.toString();
     }
 
+    public TileType[][] getMap() {
+        return map;
+    }
+
     public void printMap() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {

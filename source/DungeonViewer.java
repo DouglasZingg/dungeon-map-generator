@@ -6,7 +6,7 @@ public class DungeonViewer extends JFrame {
     private final DungeonSettings settings;
     private DungeonGenerator dungeon;
 
-    private final JTextArea mapArea;
+    private final DungeonPanel dungeonPanel;
     private final JSpinner roomCountSpinner;
     private final JSpinner widthSpinner;
     private final JSpinner heightSpinner;
@@ -55,12 +55,10 @@ public class DungeonViewer extends JFrame {
         leftPanel.add(controls, BorderLayout.NORTH);
         leftPanel.add(generateButton, BorderLayout.SOUTH);
 
-        mapArea = new JTextArea();
-        mapArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
-        mapArea.setEditable(false);
+        dungeonPanel = new DungeonPanel();
 
         add(leftPanel, BorderLayout.WEST);
-        add(new JScrollPane(mapArea), BorderLayout.CENTER);
+        add(dungeonPanel, BorderLayout.CENTER);
 
         generateDungeon();
     }
@@ -75,6 +73,6 @@ public class DungeonViewer extends JFrame {
         dungeon = new DungeonGenerator(mapWidth, mapHeight, settings);
         dungeon.generate();
 
-        mapArea.setText(dungeon.getMapAsString());
+        dungeonPanel.setDungeon(dungeon);
     }
 }
