@@ -53,7 +53,11 @@ public class DungeonViewer extends JFrame {
 
         JPanel leftPanel = new JPanel(new BorderLayout());
         leftPanel.add(controls, BorderLayout.NORTH);
-        leftPanel.add(generateButton, BorderLayout.SOUTH);
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(generateButton, BorderLayout.NORTH);
+        bottomPanel.add(createLegendPanel(), BorderLayout.CENTER);
+
+        leftPanel.add(bottomPanel, BorderLayout.SOUTH);
 
         dungeonPanel = new DungeonPanel();
 
@@ -74,5 +78,26 @@ public class DungeonViewer extends JFrame {
         dungeon.generate();
 
         dungeonPanel.setDungeon(dungeon);
+    }
+
+    private JPanel createLegendPanel() {
+        JPanel legend = new JPanel();
+        legend.setLayout(new GridLayout(0, 1, 4, 4));
+
+        legend.add(new JLabel("# Wall"));
+        legend.add(new JLabel(". Floor"));
+        legend.add(new JLabel("+ Door"));
+        legend.add(new JLabel("L Locked Door"));
+        legend.add(new JLabel("@ Player"));
+        legend.add(new JLabel("> Exit"));
+        legend.add(new JLabel("E Enemy"));
+        legend.add(new JLabel("$ Treasure"));
+        legend.add(new JLabel("^ Trap"));
+        legend.add(new JLabel("B Boss"));
+        legend.add(new JLabel("K Key"));
+        legend.add(new JLabel("! Potion"));
+        legend.add(new JLabel("? Secret Door"));
+
+        return legend;
     }
 }
