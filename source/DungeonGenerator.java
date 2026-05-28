@@ -43,12 +43,9 @@ public class DungeonGenerator {
 
             fillMapWithWalls();
             placeRooms(settings.maxRooms);
-            createSecretRoom();
             assignRoomTypes();
             connectRooms();
-
-            // placeDoors();  // no longer needed
-
+            createSecretRoom();
             placeLockedDoorAndKey();
             placePlayerAndExit();
             populateRooms();
@@ -167,27 +164,49 @@ public class DungeonGenerator {
     }
 
     private void placeDoorBetweenRooms(Room fromRoom, Room toRoom) {
-        int doorX = fromRoom.centerX();
-        int doorY = fromRoom.centerY();
+        int bestX = -1;
+        int bestY = -1;
+        int bestDistance = Integer.MAX_VALUE;
 
-        int targetX = toRoom.centerX();
-        int targetY = toRoom.centerY();
+        // Find the room-edge tile that actually touches carved hallway floor outside the room.
+        // This is more reliable than guessing a side because hallways can be L-shaped and 2 tiles wide.
+        for (int y = fromRoom.y; y < fromRoom.y + fromRoom.height; y++) {
+            for (int x = fromRoom.x; x < fromRoom.x + fromRoom.width; x++) {
+                if (!isRoomEdgeTile(x, y, fromRoom)) {
+                    continue;
+                }
 
-        if (Math.abs(targetX - doorX) > Math.abs(targetY - doorY)) {
-            if (targetX > doorX) {
-                doorX = fromRoom.x + fromRoom.width - 1;
-            } else {
-                doorX = fromRoom.x;
-            }
-        } else {
-            if (targetY > doorY) {
-                doorY = fromRoom.y + fromRoom.height - 1;
-            } else {
-                doorY = fromRoom.y;
+                if (!touchesFloorOutsideRoom(x, y, fromRoom)) {
+                    continue;
+                }
+
+                int distance = Math.abs(x - toRoom.centerX()) + Math.abs(y - toRoom.centerY());
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestX = x;
+                    bestY = y;
+                }
             }
         }
 
-        map[doorY][doorX] = TileType.DOOR;
+        if (bestX != -1 && bestY != -1) {
+            map[bestY][bestX] = TileType.DOOR;
+        }
+    }
+
+    private boolean isRoomEdgeTile(int x, int y, Room room) {
+        return x == room.x
+                || x == room.x + room.width - 1
+                || y == room.y
+                || y == room.y + room.height - 1;
+    }
+
+    private boolean touchesFloorOutsideRoom(int x, int y, Room room) {
+        return isFloorOutsideRoom(x + 1, y, room)
+                || isFloorOutsideRoom(x - 1, y, room)
+                || isFloorOutsideRoom(x, y + 1, room)
+                || isFloorOutsideRoom(x, y - 1, room);
     }
 
     private void carveHorizontalHallway(int startX, int endX, int y) {
@@ -229,11 +248,11 @@ public class DungeonGenerator {
     }
 
     private void placeLockedDoorAndKey() {
-        if (rooms.size() < 4) {
+        Room bossRoom = findRoomByType(RoomType.BOSS);
+
+        if (bossRoom == null) {
             return;
         }
-
-        Room bossRoom = rooms.get(rooms.size() - 2);
 
         for (int y = bossRoom.y - 1; y <= bossRoom.y + bossRoom.height; y++) {
             for (int x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.width; x++) {
@@ -251,14 +270,19 @@ public class DungeonGenerator {
     }
 
     private void placeKey() {
-        if (rooms.size() < 3) {
+        List<Room> validRooms = new ArrayList<>();
+
+        for (Room room : rooms) {
+            if (room.type == RoomType.COMBAT || room.type == RoomType.TREASURE || room.type == RoomType.TRAP) {
+                validRooms.add(room);
+            }
+        }
+
+        if (validRooms.isEmpty()) {
             return;
         }
 
-        // Put the key somewhere before the boss room
-        int maxRoomIndex = Math.max(1, rooms.size() - 3);
-        Room keyRoom = rooms.get(random.nextInt(maxRoomIndex) + 1);
-
+        Room keyRoom = validRooms.get(random.nextInt(validRooms.size()));
         placeRandomTileInRoom(keyRoom, TileType.KEY);
     }
 
@@ -293,12 +317,12 @@ public class DungeonGenerator {
     }
 
     private void placePlayerAndExit() {
-        if (rooms.isEmpty()) {
+        Room startRoom = findRoomByType(RoomType.START);
+        Room exitRoom = findRoomByType(RoomType.EXIT);
+
+        if (startRoom == null || exitRoom == null) {
             return;
         }
-
-        Room startRoom = rooms.get(0);
-        Room exitRoom = rooms.get(rooms.size() - 1);
 
         map[startRoom.centerY()][startRoom.centerX()] = TileType.PLAYER;
         map[exitRoom.centerY()][exitRoom.centerX()] = TileType.EXIT;
@@ -307,7 +331,8 @@ public class DungeonGenerator {
     private void populateRooms() {
         for (Room room : rooms) {
             if (room.type == RoomType.COMBAT) {
-                int enemyCount = random.nextInt(settings.maxEnemiesPerCombatRoom - settings.minEnemiesPerCombatRoom + 1) + settings.minEnemiesPerCombatRoom;
+                int enemyCount = random.nextInt(settings.maxEnemiesPerCombatRoom - settings.minEnemiesPerCombatRoom + 1)
+                        + settings.minEnemiesPerCombatRoom;
 
                 for (int i = 0; i < enemyCount; i++) {
                     placeRandomTileInRoom(room, TileType.ENEMY);
@@ -321,30 +346,26 @@ public class DungeonGenerator {
                 placeRandomTileInRoom(room, TileType.TREASURE);
 
                 if (random.nextBoolean()) {
-                    placeRandomTileInRoom(room, TileType.TREASURE);
-                }else if (room.type == RoomType.TREASURE) {
-                    placeRandomTileInRoom(room, TileType.TREASURE);
-
-                    if (random.nextBoolean()) {
-                        placeRandomTileInRoom(room, TileType.POTION);
-                    }
+                    placeRandomTileInRoom(room, TileType.POTION);
                 }
+
             } else if (room.type == RoomType.TRAP) {
-                int trapCount = random.nextInt(settings.maxTrapsPerTrapRoom - settings.minTrapsPerTrapRoom + 1) + settings.minTrapsPerTrapRoom;
+                int trapCount = random.nextInt(settings.maxTrapsPerTrapRoom - settings.minTrapsPerTrapRoom + 1)
+                        + settings.minTrapsPerTrapRoom;
 
                 for (int i = 0; i < trapCount; i++) {
                     placeRandomTileInRoom(room, TileType.TRAP);
                 }
-            }else if (room.type == RoomType.BOSS) {
+
+            } else if (room.type == RoomType.BOSS) {
                 placeRandomTileInRoom(room, TileType.BOSS);
                 placeRandomTileInRoom(room, TileType.TREASURE);
-            }else if (room.type == RoomType.SECRET) {
 
+            } else if (room.type == RoomType.SECRET) {
                 placeRandomTileInRoom(room, TileType.TREASURE);
                 placeRandomTileInRoom(room, TileType.TREASURE);
                 placeRandomTileInRoom(room, TileType.POTION);
             }
-
         }
     }
 
@@ -459,11 +480,21 @@ public class DungeonGenerator {
     }
 
     private void placeSecretDoorBetween(Room secretRoom, Room normalRoom) {
+        int doorX = secretRoom.centerX();
+        int doorY = secretRoom.centerY();
 
-        int doorX = normalRoom.centerX();
-        int doorY = normalRoom.centerY();
+        int dx = normalRoom.centerX() - secretRoom.centerX();
+        int dy = normalRoom.centerY() - secretRoom.centerY();
 
-        map[doorY][doorX] = TileType.SECRET_DOOR;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            doorX = dx > 0 ? secretRoom.x + secretRoom.width - 1 : secretRoom.x;
+        } else {
+            doorY = dy > 0 ? secretRoom.y + secretRoom.height - 1 : secretRoom.y;
+        }
+
+        if (isInsideMap(doorX, doorY)) {
+            map[doorY][doorX] = TileType.SECRET_DOOR;
+        }
     }
 
     public boolean isExitReachable() {
@@ -624,6 +655,17 @@ public class DungeonGenerator {
         return false;
     }
 
+
+    private Room findRoomByType(RoomType type) {
+        for (Room room : rooms) {
+            if (room.type == type) {
+                return room;
+            }
+        }
+
+        return null;
+    }
+
     public String getMapAsString() {
         StringBuilder builder = new StringBuilder();
 
@@ -648,5 +690,23 @@ public class DungeonGenerator {
             }
             System.out.println();
         }
+    }
+
+    public boolean isRoomTile(int x, int y) {
+        for (Room room : rooms) {
+            if (x >= room.x
+                    && x < room.x + room.width
+                    && y >= room.y
+                    && y < room.y + room.height) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    public int getRoomCount() {
+        return rooms.size();
     }
 }
