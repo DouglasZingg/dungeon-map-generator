@@ -10,7 +10,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.event.ChangeListener;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -26,6 +25,7 @@ public class DungeonViewer extends JFrame {
 
     private final DungeonPanel dungeonPanel;
     private final JSpinner roomCountSpinner;
+    private final JComboBox<MapSizePreset> mapSizeComboBox;
     private final JSpinner widthSpinner;
     private final JSpinner heightSpinner;
     private final JSpinner seedSpinner;
@@ -47,9 +47,12 @@ public class DungeonViewer extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout());
 
-        roomCountSpinner = new JSpinner(new SpinnerNumberModel(settings.maxRooms, 3, 50, 1));
-        widthSpinner = new JSpinner(new SpinnerNumberModel(60, 20, 150, 1));
-        heightSpinner = new JSpinner(new SpinnerNumberModel(30, 10, 80, 1));
+        mapSizeComboBox = new JComboBox<>(MapSizePreset.values());
+        mapSizeComboBox.setSelectedItem(MapSizePreset.MEDIUM_36x48);
+
+        roomCountSpinner = new JSpinner(new SpinnerNumberModel(MapSizePreset.MEDIUM_36x48.getRecommendedRooms(), 3, 100, 1));
+        widthSpinner = new JSpinner(new SpinnerNumberModel(MapSizePreset.MEDIUM_36x48.getWidth(), 8, 150, 1));
+        heightSpinner = new JSpinner(new SpinnerNumberModel(MapSizePreset.MEDIUM_36x48.getHeight(), 8, 100, 1));
         seedSpinner = new JSpinner(new SpinnerNumberModel(12345L, 1L, Long.MAX_VALUE, 1L));
         combatChanceSpinner = new JSpinner(new SpinnerNumberModel(settings.combatRoomChance, 0, 100, 5));
         treasureChanceSpinner = new JSpinner(new SpinnerNumberModel(settings.treasureRoomChance, 0, 100, 5));
@@ -62,19 +65,22 @@ public class DungeonViewer extends JFrame {
         add(new JScrollPane(dungeonPanel), BorderLayout.CENTER);
 
         registerListeners();
-        generateDungeon(false);
+        generateDungeon(false, true);
     }
 
     private JPanel createLeftPanel() {
         JPanel leftPanel = new JPanel(new BorderLayout(8, 8));
+        leftPanel.setPreferredSize(new Dimension(320, 750));
         leftPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
         JPanel controls = new JPanel(new GridLayout(0, 2, 8, 8));
+        controls.add(new JLabel("Map Size:"));
+        controls.add(mapSizeComboBox);
         controls.add(new JLabel("Rooms:"));
         controls.add(roomCountSpinner);
-        controls.add(new JLabel("Map Width:"));
+        controls.add(new JLabel("Custom Width:"));
         controls.add(widthSpinner);
-        controls.add(new JLabel("Map Height:"));
+        controls.add(new JLabel("Custom Height:"));
         controls.add(heightSpinner);
         controls.add(new JLabel("Combat %:"));
         controls.add(combatChanceSpinner);
@@ -91,16 +97,13 @@ public class DungeonViewer extends JFrame {
 
         JPanel buttonPanel = new JPanel(new GridLayout(0, 1, 4, 4));
         JButton generateButton = new JButton("Generate Dungeon");
-        generateButton.addActionListener(e -> generateDungeon(false));
+        generateButton.addActionListener(e -> generateDungeon(false, true));
 
         JButton animateButton = new JButton("Animate Generation");
-        animateButton.addActionListener(e -> generateDungeon(true));
+        animateButton.addActionListener(e -> generateDungeon(true, true));
 
-        JButton randomSeedButton = new JButton("Random Seed");
-        randomSeedButton.addActionListener(e -> {
-            seedSpinner.setValue(System.currentTimeMillis());
-            generateDungeon(true);
-        });
+        JButton seedButton = new JButton("Regenerate From Seed");
+        seedButton.addActionListener(e -> generateDungeon(false, false));
 
         JButton saveButton = new JButton("Save Map");
         saveButton.addActionListener(e -> saveMapToFile());
@@ -110,7 +113,7 @@ public class DungeonViewer extends JFrame {
 
         buttonPanel.add(generateButton);
         buttonPanel.add(animateButton);
-        buttonPanel.add(randomSeedButton);
+        buttonPanel.add(seedButton);
         buttonPanel.add(saveButton);
         buttonPanel.add(exportImageButton);
 
@@ -125,15 +128,9 @@ public class DungeonViewer extends JFrame {
     }
 
     private void registerListeners() {
-        ChangeListener autoGenerate = e -> generateDungeon(false);
-
-        roomCountSpinner.addChangeListener(autoGenerate);
-        widthSpinner.addChangeListener(autoGenerate);
-        heightSpinner.addChangeListener(autoGenerate);
-        seedSpinner.addChangeListener(autoGenerate);
-        combatChanceSpinner.addChangeListener(autoGenerate);
-        treasureChanceSpinner.addChangeListener(autoGenerate);
-        trapChanceSpinner.addChangeListener(autoGenerate);
+        // Settings controls intentionally do not auto-generate.
+        // Change the controls, then press Generate Dungeon or Animate Generation.
+        mapSizeComboBox.addActionListener(e -> applyMapSizePreset());
 
         zoomSlider.addChangeListener(e -> dungeonPanel.setTileSize(zoomSlider.getValue()));
         themeComboBox.addActionListener(e -> {
@@ -141,17 +138,56 @@ public class DungeonViewer extends JFrame {
             refreshLegendPanel();
             updateStatus();
         });
+
+        applyMapSizePreset();
     }
 
-    private void generateDungeon(boolean animate) {
+    private void applyMapSizePreset() {
+        MapSizePreset preset = (MapSizePreset) mapSizeComboBox.getSelectedItem();
+
+        if (preset == null) {
+            return;
+        }
+
+        boolean custom = preset.isCustom();
+        widthSpinner.setEnabled(custom);
+        heightSpinner.setEnabled(custom);
+
+        if (!custom) {
+            widthSpinner.setValue(preset.getWidth());
+            heightSpinner.setValue(preset.getHeight());
+            roomCountSpinner.setValue(preset.getRecommendedRooms());
+        }
+
+        statusLabel.setText(custom
+                ? "Custom size selected. Set Custom Width/Height, then press Generate Dungeon."
+                : "Preset selected: " + preset + ". Press Generate Dungeon to apply.");
+    }
+
+    private void generateDungeon(boolean animate, boolean createNewSeed) {
         settings.maxRooms = getSpinnerInt(roomCountSpinner);
-        settings.seed = getSpinnerLong(seedSpinner);
+
+        if (createNewSeed) {
+            settings.seed = System.currentTimeMillis();
+            seedSpinner.setValue(settings.seed);
+        } else {
+            settings.seed = getSpinnerLong(seedSpinner);
+        }
         settings.combatRoomChance = getSpinnerInt(combatChanceSpinner);
         settings.treasureRoomChance = getSpinnerInt(treasureChanceSpinner);
         settings.trapRoomChance = getSpinnerInt(trapChanceSpinner);
 
-        int mapWidth = getSpinnerInt(widthSpinner);
-        int mapHeight = getSpinnerInt(heightSpinner);
+        MapSizePreset preset = (MapSizePreset) mapSizeComboBox.getSelectedItem();
+        int mapWidth;
+        int mapHeight;
+
+        if (preset != null && !preset.isCustom()) {
+            mapWidth = preset.getWidth();
+            mapHeight = preset.getHeight();
+        } else {
+            mapWidth = getSpinnerInt(widthSpinner);
+            mapHeight = getSpinnerInt(heightSpinner);
+        }
 
         dungeon = new DungeonGenerator(mapWidth, mapHeight, settings);
         dungeon.generate();
@@ -181,7 +217,8 @@ public class DungeonViewer extends JFrame {
         }
 
         statusLabel.setText(
-                "Rooms: " + dungeon.getRoomCount()
+                "Algorithm: Packed BSP | Size: " + dungeon.getWidth() + "x" + dungeon.getHeight()
+                        + " | Rooms: " + dungeon.getRoomCount()
                         + " | Seed: " + settings.seed
                         + " | Theme: " + themeComboBox.getSelectedItem()
                         + " | Exit reachable: " + dungeon.isExitReachable()

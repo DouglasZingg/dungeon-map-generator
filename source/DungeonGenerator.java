@@ -1,6 +1,9 @@
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 public class DungeonGenerator {
     private final int width;
@@ -9,6 +12,25 @@ public class DungeonGenerator {
     private final List<Room> rooms;
     private final Random random;
     private final DungeonSettings settings;
+    private final Set<String> connectedRoomPairs = new HashSet<>();
+
+    private static class Area {
+        int x;
+        int y;
+        int width;
+        int height;
+
+        Area(int x, int y, int width, int height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        int area() {
+            return width * height;
+        }
+    }
 
     public DungeonGenerator(int width, int height, DungeonSettings settings) {
         this.width = width;
@@ -19,32 +41,15 @@ public class DungeonGenerator {
         this.random = new Random(settings.seed);
     }
 
-    public void printLegend() {
-        System.out.println();
-        System.out.println("Legend:");
-        System.out.println("# = Wall");
-        System.out.println(". = Floor");
-        System.out.println("+ = Door");
-        System.out.println("@ = Player Start");
-        System.out.println("> = Exit");
-        System.out.println("E = Enemy");
-        System.out.println("$ = Treasure");
-        System.out.println("^ = Trap");
-        System.out.println("B = Boss");
-        System.out.println("L = Locked Door");
-        System.out.println("K = Key");
-        System.out.println("! = Potion");
-        System.out.println("? = Secret Door");
-    }
-
     public void generate() {
         for (int attempt = 1; attempt <= settings.maxGenerationAttempts; attempt++) {
             rooms.clear();
+            connectedRoomPairs.clear();
 
             fillMapWithWalls();
-            placeRooms(settings.maxRooms);
+            placePackedRooms(settings.maxRooms);
             assignRoomTypes();
-            connectRooms();
+            connectRoomsPacked();
             createSecretRoom();
             placeLockedDoorAndKey();
             placePlayerAndExit();
@@ -58,41 +63,6 @@ public class DungeonGenerator {
         System.out.println("Warning: Could not generate a fully valid dungeon.");
     }
 
-    public void printSummary() {
-        int enemies = countTiles(TileType.ENEMY);
-        int treasures = countTiles(TileType.TREASURE);
-        int traps = countTiles(TileType.TRAP);
-        int potions = countTiles(TileType.POTION);
-        int doors = countTiles(TileType.DOOR);
-        int lockedDoors = countTiles(TileType.LOCKED_DOOR);
-        int secretDoors = countTiles(TileType.SECRET_DOOR);
-
-        System.out.println();
-        System.out.println("Dungeon Summary:");
-        System.out.println("Rooms: " + rooms.size());
-        System.out.println("Enemies: " + enemies);
-        System.out.println("Treasures: " + treasures);
-        System.out.println("Traps: " + traps);
-        System.out.println("Potions: " + potions);
-        System.out.println("Doors: " + doors);
-        System.out.println("Locked Doors: " + lockedDoors);
-        System.out.println("Secret Doors: " + secretDoors);
-    }
-
-    private int countTiles(TileType tileType) {
-        int count = 0;
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (map[y][x] == tileType) {
-                    count++;
-                }
-            }
-        }
-
-        return count;
-    }
-
     private void fillMapWithWalls() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
@@ -101,34 +71,124 @@ public class DungeonGenerator {
         }
     }
 
-    private void placeRooms(int maxRooms) {
-        for (int i = 0; i < maxRooms; i++) {
-            int roomWidth = random.nextInt(settings.maxRoomWidth - settings.minRoomWidth + 1)
-                    + settings.minRoomWidth;
+    private void placePackedRooms(int targetRooms) {
+        List<Area> leaves = new ArrayList<>();
+        leaves.add(new Area(1, 1, width - 2, height - 2));
 
-            int roomHeight = random.nextInt(settings.maxRoomHeight - settings.minRoomHeight + 1)
-                    + settings.minRoomHeight;
+        int safety = 0;
+        while (leaves.size() < targetRooms && safety < settings.maxRoomPlacementAttempts) {
+            safety++;
+            Area largest = leaves.stream().max(Comparator.comparingInt(Area::area)).orElse(null);
 
-            int x = random.nextInt(width - roomWidth - 2) + 1;
-            int y = random.nextInt(height - roomHeight - 2) + 1;
+            if (largest == null || !canSplit(largest)) {
+                break;
+            }
 
-            Room newRoom = new Room(x, y, roomWidth, roomHeight);
+            leaves.remove(largest);
+            splitArea(largest, leaves);
+        }
 
-            if (!doesRoomOverlap(newRoom)) {
-                carveRoom(newRoom);
-                rooms.add(newRoom);
+        for (Area leaf : leaves) {
+            Room room = createRoomFromArea(leaf);
+            if (room != null && !doesRoomOverlap(room)) {
+                carveRoom(room);
+                rooms.add(room);
             }
         }
     }
 
+    private boolean canSplit(Area area) {
+        int minLeafWidth = settings.minRoomWidth + 2;
+        int minLeafHeight = settings.minRoomHeight + 2;
+        return area.width >= minLeafWidth * 2 || area.height >= minLeafHeight * 2;
+    }
+
+    private void splitArea(Area area, List<Area> leaves) {
+        int minLeafWidth = settings.minRoomWidth + 2;
+        int minLeafHeight = settings.minRoomHeight + 2;
+
+        boolean splitVertical;
+        if (area.width > area.height * 1.25) {
+            splitVertical = true;
+        } else if (area.height > area.width * 1.25) {
+            splitVertical = false;
+        } else {
+            splitVertical = random.nextBoolean();
+        }
+
+        if (splitVertical && area.width < minLeafWidth * 2) {
+            splitVertical = false;
+        }
+        if (!splitVertical && area.height < minLeafHeight * 2) {
+            splitVertical = true;
+        }
+
+        if (splitVertical) {
+            int maxSplit = area.width - minLeafWidth;
+            int split = random.nextInt(maxSplit - minLeafWidth + 1) + minLeafWidth;
+            leaves.add(new Area(area.x, area.y, split, area.height));
+            leaves.add(new Area(area.x + split, area.y, area.width - split, area.height));
+        } else {
+            int maxSplit = area.height - minLeafHeight;
+            int split = random.nextInt(maxSplit - minLeafHeight + 1) + minLeafHeight;
+            leaves.add(new Area(area.x, area.y, area.width, split));
+            leaves.add(new Area(area.x, area.y + split, area.width, area.height - split));
+        }
+    }
+
+    private Room createRoomFromArea(Area area) {
+        // Keep a one-tile buffer inside each BSP leaf when possible.
+        // This prevents rooms from visually merging/colliding when two leaves touch.
+        int margin = 1;
+        int usableX = area.x + margin;
+        int usableY = area.y + margin;
+        int usableWidth = area.width - margin * 2;
+        int usableHeight = area.height - margin * 2;
+
+        if (usableWidth < settings.minRoomWidth || usableHeight < settings.minRoomHeight) {
+            usableX = area.x;
+            usableY = area.y;
+            usableWidth = area.width;
+            usableHeight = area.height;
+        }
+
+        int maxW = Math.min(settings.maxRoomWidth, usableWidth);
+        int maxH = Math.min(settings.maxRoomHeight, usableHeight);
+        int minW = Math.min(settings.minRoomWidth, maxW);
+        int minH = Math.min(settings.minRoomHeight, maxH);
+
+        if (maxW < 3 || maxH < 3) {
+            return null;
+        }
+
+        int roomWidth = random.nextInt(maxW - minW + 1) + minW;
+        int roomHeight = random.nextInt(maxH - minH + 1) + minH;
+
+        int freeX = Math.max(0, usableWidth - roomWidth);
+        int freeY = Math.max(0, usableHeight - roomHeight);
+        int x = usableX + random.nextInt(freeX + 1);
+        int y = usableY + random.nextInt(freeY + 1);
+
+        x = Math.max(1, Math.min(x, width - roomWidth - 1));
+        y = Math.max(1, Math.min(y, height - roomHeight - 1));
+
+        return new Room(x, y, roomWidth, roomHeight);
+    }
+
     private boolean doesRoomOverlap(Room newRoom) {
         for (Room room : rooms) {
-            if (newRoom.intersects(room)) {
+            if (roomsOverlapWithPadding(newRoom, room, settings.roomPadding)) {
                 return true;
             }
         }
-
         return false;
+    }
+
+    private boolean roomsOverlapWithPadding(Room a, Room b, int padding) {
+        return a.x - padding < b.x + b.width
+                && a.x + a.width + padding > b.x
+                && a.y - padding < b.y + b.height
+                && a.y + a.height + padding > b.y;
     }
 
     private void carveRoom(Room room) {
@@ -139,74 +199,222 @@ public class DungeonGenerator {
         }
     }
 
-    private void connectRooms() {
+    private void connectRoomsPacked() {
+        if (rooms.size() < 2) {
+            return;
+        }
+
+        // Main pass: connect each room to its nearest previous room.
         for (int i = 1; i < rooms.size(); i++) {
-            Room previousRoom = rooms.get(i - 1);
             Room currentRoom = rooms.get(i);
+            Room nearestRoom = findNearestPreviousRoom(currentRoom, i);
+            connectTwoRooms(nearestRoom, currentRoom);
+        }
 
-            int x1 = previousRoom.centerX();
-            int y1 = previousRoom.centerY();
+        // Optional extra short links make the dungeon feel less like a tree and more like a packed map.
+        for (int i = 0; i < rooms.size(); i++) {
+            Room room = rooms.get(i);
+            Room nearest = findNearestRoom(room, i);
+            if (nearest != null
+                    && edgeDistance(room, nearest) <= settings.extraConnectionMaxDistance
+                    && random.nextInt(100) < settings.extraConnectionChance) {
+                connectTwoRooms(room, nearest);
+            }
+        }
+    }
 
-            int x2 = currentRoom.centerX();
-            int y2 = currentRoom.centerY();
+    private Room findNearestPreviousRoom(Room room, int previousRoomCount) {
+        Room nearestRoom = rooms.get(0);
+        int nearestDistance = Integer.MAX_VALUE;
 
-            if (random.nextBoolean()) {
-                carveHorizontalHallway(x1, x2, y1);
-                carveVerticalHallway(y1, y2, x2);
+        for (int i = 0; i < previousRoomCount; i++) {
+            Room candidate = rooms.get(i);
+            int distance = edgeDistance(room, candidate);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestRoom = candidate;
+            }
+        }
+
+        return nearestRoom;
+    }
+
+    private Room findNearestRoom(Room room, int roomIndex) {
+        Room nearestRoom = null;
+        int nearestDistance = Integer.MAX_VALUE;
+
+        for (int i = 0; i < rooms.size(); i++) {
+            if (i == roomIndex) {
+                continue;
+            }
+
+            Room candidate = rooms.get(i);
+            int distance = edgeDistance(room, candidate);
+            if (distance < nearestDistance && !isConnected(roomIndex, i)) {
+                nearestDistance = distance;
+                nearestRoom = candidate;
+            }
+        }
+
+        return nearestRoom;
+    }
+
+    private int edgeDistance(Room a, Room b) {
+        int horizontalGap = Math.max(0, Math.max(a.x - (b.x + b.width - 1), b.x - (a.x + a.width - 1)));
+        int verticalGap = Math.max(0, Math.max(a.y - (b.y + b.height - 1), b.y - (a.y + a.height - 1)));
+        return horizontalGap + verticalGap;
+    }
+
+    private void connectTwoRooms(Room roomA, Room roomB) {
+        int indexA = rooms.indexOf(roomA);
+        int indexB = rooms.indexOf(roomB);
+        if (indexA != -1 && indexB != -1 && isConnected(indexA, indexB)) {
+            return;
+        }
+
+        ConnectionPoints connection = getConnectionPoints(roomA, roomB);
+
+        if (random.nextBoolean()) {
+            carveHorizontalHallway(connection.startX, connection.endX, connection.startY);
+            carveVerticalHallway(connection.startY, connection.endY, connection.endX);
+        } else {
+            carveVerticalHallway(connection.startY, connection.endY, connection.startX);
+            carveHorizontalHallway(connection.startX, connection.endX, connection.endY);
+        }
+
+        placeDoor(connection.startX, connection.startY);
+        placeDoor(connection.endX, connection.endY);
+
+        if (indexA != -1 && indexB != -1) {
+            connectedRoomPairs.add(pairKey(indexA, indexB));
+        }
+    }
+
+    private static class ConnectionPoints {
+        int doorAX;
+        int doorAY;
+        int startX;
+        int startY;
+        int doorBX;
+        int doorBY;
+        int endX;
+        int endY;
+    }
+
+    private ConnectionPoints getConnectionPoints(Room a, Room b) {
+        ConnectionPoints points = new ConnectionPoints();
+
+        boolean horizontal = Math.abs(a.centerX() - b.centerX()) >= Math.abs(a.centerY() - b.centerY());
+
+        if (horizontal) {
+            int yA = clamp(b.centerY(), a.y + 1, a.y + a.height - 2);
+            int yB = clamp(yA, b.y + 1, b.y + b.height - 2);
+
+            if (b.centerX() >= a.centerX()) {
+                points.doorAX = a.x + a.width - 1;
+                points.startX = points.doorAX + 1;
+                points.doorBX = b.x;
+                points.endX = points.doorBX - 1;
             } else {
-                carveVerticalHallway(y1, y2, x1);
-                carveHorizontalHallway(x1, x2, y2);
+                points.doorAX = a.x;
+                points.startX = points.doorAX - 1;
+                points.doorBX = b.x + b.width - 1;
+                points.endX = points.doorBX + 1;
             }
 
-            placeDoorBetweenRooms(previousRoom, currentRoom);
-            placeDoorBetweenRooms(currentRoom, previousRoom);
+            points.doorAY = yA;
+            points.startY = yA;
+            points.doorBY = yB;
+            points.endY = yB;
+        } else {
+            int xA = clamp(b.centerX(), a.x + 1, a.x + a.width - 2);
+            int xB = clamp(xA, b.x + 1, b.x + b.width - 2);
+
+            if (b.centerY() >= a.centerY()) {
+                points.doorAY = a.y + a.height - 1;
+                points.startY = points.doorAY + 1;
+                points.doorBY = b.y;
+                points.endY = points.doorBY - 1;
+            } else {
+                points.doorAY = a.y;
+                points.startY = points.doorAY - 1;
+                points.doorBY = b.y + b.height - 1;
+                points.endY = points.doorBY + 1;
+            }
+
+            points.doorAX = xA;
+            points.startX = xA;
+            points.doorBX = xB;
+            points.endX = xB;
         }
+
+        points.startX = clamp(points.startX, 1, width - 2);
+        points.startY = clamp(points.startY, 1, height - 2);
+        points.endX = clamp(points.endX, 1, width - 2);
+        points.endY = clamp(points.endY, 1, height - 2);
+
+        return points;
     }
 
-    private void placeDoorBetweenRooms(Room fromRoom, Room toRoom) {
-        int bestX = -1;
-        int bestY = -1;
-        int bestDistance = Integer.MAX_VALUE;
+    private int clamp(int value, int min, int max) {
+        if (max < min) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
+    }
 
-        // Find the room-edge tile that actually touches carved hallway floor outside the room.
-        // This is more reliable than guessing a side because hallways can be L-shaped and 2 tiles wide.
-        for (int y = fromRoom.y; y < fromRoom.y + fromRoom.height; y++) {
-            for (int x = fromRoom.x; x < fromRoom.x + fromRoom.width; x++) {
-                if (!isRoomEdgeTile(x, y, fromRoom)) {
+    private void placeDoor(int x, int y) {
+        if (!isInsideMap(x, y)) {
+            return;
+        }
+
+        // Doors should only be placed on hallway tiles directly outside a room.
+        // This prevents doors from appearing randomly inside room interiors.
+        if (map[y][x] != TileType.FLOOR) {
+            return;
+        }
+
+        if (isInsideAnyRoom(x, y)) {
+            return;
+        }
+
+        if (!touchesAnyRoom(x, y)) {
+            return;
+        }
+
+        if (hasNearbyDoor(x, y)) {
+            return;
+        }
+
+        map[y][x] = TileType.DOOR;
+    }
+
+    private boolean hasNearbyDoor(int x, int y) {
+        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
+            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
+                if (!isInsideMap(checkX, checkY)) {
                     continue;
                 }
 
-                if (!touchesFloorOutsideRoom(x, y, fromRoom)) {
-                    continue;
-                }
-
-                int distance = Math.abs(x - toRoom.centerX()) + Math.abs(y - toRoom.centerY());
-
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestX = x;
-                    bestY = y;
+                TileType tile = map[checkY][checkX];
+                if (tile == TileType.DOOR
+                        || tile == TileType.LOCKED_DOOR
+                        || tile == TileType.SECRET_DOOR) {
+                    return true;
                 }
             }
         }
-
-        if (bestX != -1 && bestY != -1) {
-            map[bestY][bestX] = TileType.DOOR;
-        }
+        return false;
     }
 
-    private boolean isRoomEdgeTile(int x, int y, Room room) {
-        return x == room.x
-                || x == room.x + room.width - 1
-                || y == room.y
-                || y == room.y + room.height - 1;
+    private boolean isConnected(int indexA, int indexB) {
+        return connectedRoomPairs.contains(pairKey(indexA, indexB));
     }
 
-    private boolean touchesFloorOutsideRoom(int x, int y, Room room) {
-        return isFloorOutsideRoom(x + 1, y, room)
-                || isFloorOutsideRoom(x - 1, y, room)
-                || isFloorOutsideRoom(x, y + 1, room)
-                || isFloorOutsideRoom(x, y - 1, room);
+    private String pairKey(int indexA, int indexB) {
+        int a = Math.min(indexA, indexB);
+        int b = Math.max(indexA, indexB);
+        return a + "-" + b;
     }
 
     private void carveHorizontalHallway(int startX, int endX, int y) {
@@ -215,7 +423,6 @@ public class DungeonGenerator {
 
         for (int x = minX; x <= maxX; x++) {
             carveFloor(x, y);
-            carveFloor(x, y + 1);
         }
     }
 
@@ -225,26 +432,40 @@ public class DungeonGenerator {
 
         for (int y = minY; y <= maxY; y++) {
             carveFloor(x, y);
-            carveFloor(x + 1, y);
         }
     }
 
     private void carveFloor(int x, int y) {
-        if (x < 0 || x >= width || y < 0 || y >= height) {
+        if (!isInsideMap(x, y)) {
+            return;
+        }
+
+        // Hallways are one tile wide and should not cut through room interiors.
+        // They may start/end beside a room, then a door is placed on that hallway tile.
+        if (isInsideAnyRoom(x, y)) {
             return;
         }
 
         map[y][x] = TileType.FLOOR;
     }
 
-    private void placeDoors() {
+    private boolean isInsideAnyRoom(int x, int y) {
         for (Room room : rooms) {
-            if (room.type == RoomType.SECRET) {
-                continue;
+            if (x >= room.x
+                    && x < room.x + room.width
+                    && y >= room.y
+                    && y < room.y + room.height) {
+                return true;
             }
-
-            placeDoorsForRoom(room);
         }
+        return false;
+    }
+
+    private boolean touchesAnyRoom(int x, int y) {
+        return isInsideAnyRoom(x + 1, y)
+                || isInsideAnyRoom(x - 1, y)
+                || isInsideAnyRoom(x, y + 1)
+                || isInsideAnyRoom(x, y - 1);
     }
 
     private void placeLockedDoorAndKey() {
@@ -284,36 +505,6 @@ public class DungeonGenerator {
 
         Room keyRoom = validRooms.get(random.nextInt(validRooms.size()));
         placeRandomTileInRoom(keyRoom, TileType.KEY);
-    }
-
-    private void placeRoomDoors(Room room) {
-        // Top and bottom walls
-        for (int x = room.x; x < room.x + room.width; x++) {
-            tryPlaceDoor(x, room.y - 1);
-            tryPlaceDoor(x, room.y + room.height);
-        }
-
-        // Left and right walls
-        for (int y = room.y; y < room.y + room.height; y++) {
-            tryPlaceDoor(room.x - 1, y);
-            tryPlaceDoor(room.x + room.width, y);
-        }
-    }
-
-    private void tryPlaceDoor(int x, int y) {
-        if (x <= 0 || x >= width - 1 || y <= 0 || y >= height - 1) {
-            return;
-        }
-
-        if (map[y][x] != TileType.FLOOR) {
-            return;
-        }
-
-        if (hasNearbyDoor(x, y)) {
-            return;
-        }
-
-        map[y][x] = TileType.DOOR;
     }
 
     private void placePlayerAndExit() {
@@ -370,6 +561,10 @@ public class DungeonGenerator {
     }
 
     private void placeRandomTileInRoom(Room room, TileType tile) {
+        if (room.width <= 2 || room.height <= 2) {
+            return;
+        }
+
         for (int attempt = 0; attempt < 20; attempt++) {
             int x = random.nextInt(room.width - 2) + room.x + 1;
             int y = random.nextInt(room.height - 2) + room.y + 1;
@@ -410,90 +605,55 @@ public class DungeonGenerator {
         int roomWidth = 5;
         int roomHeight = 5;
 
-        for (int attempt = 0; attempt < 50; attempt++) {
+        if (width <= roomWidth + 2 || height <= roomHeight + 2 || rooms.isEmpty()) {
+            return;
+        }
 
+        for (int attempt = 0; attempt < 50; attempt++) {
             int x = random.nextInt(width - roomWidth - 2) + 1;
             int y = random.nextInt(height - roomHeight - 2) + 1;
 
             Room secretRoom = new Room(x, y, roomWidth, roomHeight);
 
             if (!doesRoomOverlap(secretRoom)) {
-
                 carveRoom(secretRoom);
-
                 secretRoom.type = RoomType.SECRET;
-
                 rooms.add(secretRoom);
-
                 connectSecretRoom(secretRoom);
-
                 return;
             }
         }
     }
 
     private void connectSecretRoom(Room secretRoom) {
-
-        Room nearestRoom = rooms.get(0);
-
-        double nearestDistance = Double.MAX_VALUE;
+        Room nearestRoom = null;
+        int nearestDistance = Integer.MAX_VALUE;
 
         for (Room room : rooms) {
-
             if (room == secretRoom) {
                 continue;
             }
 
-            double dx = room.centerX() - secretRoom.centerX();
-            double dy = room.centerY() - secretRoom.centerY();
-
-            double distance = Math.sqrt(dx * dx + dy * dy);
-
+            int distance = edgeDistance(secretRoom, room);
             if (distance < nearestDistance) {
                 nearestDistance = distance;
                 nearestRoom = room;
             }
         }
 
-        int x1 = secretRoom.centerX();
-        int y1 = secretRoom.centerY();
-
-        int x2 = nearestRoom.centerX();
-        int y2 = nearestRoom.centerY();
-
-        carveSecretHallway(x1, x2, y1);
-        carveSecretHallwayVertical(y1, y2, x2);
-
-        placeSecretDoorBetween(secretRoom, nearestRoom);
-    }
-
-    private void carveSecretHallway(int startX, int endX, int y) {
-        for (int x = Math.min(startX, endX); x <= Math.max(startX, endX); x++) {
-            carveFloor(x, y);
-        }
-    }
-
-    private void carveSecretHallwayVertical(int startY, int endY, int x) {
-        for (int y = Math.min(startY, endY); y <= Math.max(startY, endY); y++) {
-            carveFloor(x, y);
-        }
-    }
-
-    private void placeSecretDoorBetween(Room secretRoom, Room normalRoom) {
-        int doorX = secretRoom.centerX();
-        int doorY = secretRoom.centerY();
-
-        int dx = normalRoom.centerX() - secretRoom.centerX();
-        int dy = normalRoom.centerY() - secretRoom.centerY();
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-            doorX = dx > 0 ? secretRoom.x + secretRoom.width - 1 : secretRoom.x;
-        } else {
-            doorY = dy > 0 ? secretRoom.y + secretRoom.height - 1 : secretRoom.y;
+        if (nearestRoom == null) {
+            return;
         }
 
-        if (isInsideMap(doorX, doorY)) {
-            map[doorY][doorX] = TileType.SECRET_DOOR;
+        ConnectionPoints connection = getConnectionPoints(secretRoom, nearestRoom);
+        carveHorizontalHallway(connection.startX, connection.endX, connection.startY);
+        carveVerticalHallway(connection.startY, connection.endY, connection.endX);
+        placeDoor(connection.endX, connection.endY);
+        if (isInsideMap(connection.startX, connection.startY)
+                && map[connection.startY][connection.startX] == TileType.FLOOR
+                && !isInsideAnyRoom(connection.startX, connection.startY)
+                && touchesAnyRoom(connection.startX, connection.startY)) {
+            map[connection.startY][connection.startX] = TileType.SECRET_DOOR;
         }
     }
 
@@ -524,7 +684,7 @@ public class DungeonGenerator {
     }
 
     private boolean floodFill(int x, int y, int exitX, int exitY, boolean[][] visited) {
-        if (x < 0 || x >= width || y < 0 || y >= height) {
+        if (!isInsideMap(x, y)) {
             return false;
         }
 
@@ -551,6 +711,8 @@ public class DungeonGenerator {
     private boolean isWalkable(TileType tile) {
         return tile == TileType.FLOOR
                 || tile == TileType.DOOR
+                || tile == TileType.LOCKED_DOOR
+                || tile == TileType.SECRET_DOOR
                 || tile == TileType.PLAYER
                 || tile == TileType.EXIT
                 || tile == TileType.ENEMY
@@ -558,103 +720,8 @@ public class DungeonGenerator {
                 || tile == TileType.TRAP
                 || tile == TileType.BOSS
                 || tile == TileType.KEY
-                || tile == TileType.POTION
-                || tile == TileType.LOCKED_DOOR;
+                || tile == TileType.POTION;
     }
-
-    private void placeDoorsForRoom(Room room) {
-        // Top and bottom edges
-        for (int x = room.x; x < room.x + room.width; x++) {
-            tryPlaceDoorAtRoomEdge(x, room.y - 1, room);
-            tryPlaceDoorAtRoomEdge(x, room.y + room.height, room);
-        }
-
-        // Left and right edges
-        for (int y = room.y; y < room.y + room.height; y++) {
-            tryPlaceDoorAtRoomEdge(room.x - 1, y, room);
-            tryPlaceDoorAtRoomEdge(room.x + room.width, y, room);
-        }
-    }
-
-    private void tryPlaceDoorAtRoomEdge(int x, int y, Room room) {
-        if (!isInsideMap(x, y)) {
-            return;
-        }
-
-        if (map[y][x] != TileType.FLOOR) {
-            return;
-        }
-
-        if (!touchesRoomInterior(x, y, room)) {
-            return;
-        }
-
-        if (!touchesHallwayOutsideRoom(x, y, room)) {
-            return;
-        }
-
-        if (hasNearbyDoor(x, y)) {
-            return;
-        }
-
-        map[y][x] = TileType.DOOR;
-    }
-
-    private boolean touchesRoomInterior(int x, int y, Room room) {
-        return isInsideRoom(x + 1, y, room)
-                || isInsideRoom(x - 1, y, room)
-                || isInsideRoom(x, y + 1, room)
-                || isInsideRoom(x, y - 1, room);
-    }
-
-    private boolean touchesHallwayOutsideRoom(int x, int y, Room room) {
-        return isFloorOutsideRoom(x + 1, y, room)
-                || isFloorOutsideRoom(x - 1, y, room)
-                || isFloorOutsideRoom(x, y + 1, room)
-                || isFloorOutsideRoom(x, y - 1, room);
-    }
-
-    private boolean isFloorOutsideRoom(int x, int y, Room room) {
-        if (!isInsideMap(x, y)) {
-            return false;
-        }
-
-        if (isInsideRoom(x, y, room)) {
-            return false;
-        }
-
-        return map[y][x] == TileType.FLOOR;
-    }
-
-    private boolean isInsideRoom(int x, int y, Room room) {
-        return x >= room.x
-                && x < room.x + room.width
-                && y >= room.y
-                && y < room.y + room.height;
-    }
-
-    private boolean isInsideMap(int x, int y) {
-        return x >= 0 && x < width && y >= 0 && y < height;
-    }
-
-    private boolean hasNearbyDoor(int x, int y) {
-        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
-            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
-                if (!isInsideMap(checkX, checkY)) {
-                    continue;
-                }
-
-                if (map[checkY][checkX] == TileType.DOOR
-                        || map[checkY][checkX] == TileType.LOCKED_DOOR
-                        || map[checkY][checkX] == TileType.SECRET_DOOR) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
 
     private Room findRoomByType(RoomType type) {
         for (Room room : rooms) {
@@ -664,6 +731,10 @@ public class DungeonGenerator {
         }
 
         return null;
+    }
+
+    private boolean isInsideMap(int x, int y) {
+        return x >= 0 && x < width && y >= 0 && y < height;
     }
 
     public String getMapAsString() {
@@ -684,12 +755,50 @@ public class DungeonGenerator {
     }
 
     public void printMap() {
+        System.out.print(getMapAsString());
+    }
+
+    public void printLegend() {
+        System.out.println();
+        System.out.println("Legend:");
+        System.out.println("# = Wall");
+        System.out.println(". = Floor");
+        System.out.println("+ = Door");
+        System.out.println("@ = Player Start");
+        System.out.println("> = Exit");
+        System.out.println("E = Enemy");
+        System.out.println("$ = Treasure");
+        System.out.println("^ = Trap");
+        System.out.println("B = Boss");
+        System.out.println("L = Locked Door");
+        System.out.println("K = Key");
+        System.out.println("! = Potion");
+        System.out.println("? = Secret Door");
+    }
+
+    public void printSummary() {
+        System.out.println();
+        System.out.println("Dungeon Summary:");
+        System.out.println("Rooms: " + rooms.size());
+        System.out.println("Enemies: " + countTiles(TileType.ENEMY));
+        System.out.println("Treasures: " + countTiles(TileType.TREASURE));
+        System.out.println("Traps: " + countTiles(TileType.TRAP));
+        System.out.println("Potions: " + countTiles(TileType.POTION));
+        System.out.println("Doors: " + countTiles(TileType.DOOR));
+        System.out.println("Locked Doors: " + countTiles(TileType.LOCKED_DOOR));
+        System.out.println("Secret Doors: " + countTiles(TileType.SECRET_DOOR));
+    }
+
+    private int countTiles(TileType tileType) {
+        int count = 0;
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                System.out.print(map[y][x].getSymbol());
+                if (map[y][x] == tileType) {
+                    count++;
+                }
             }
-            System.out.println();
         }
+        return count;
     }
 
     public boolean isRoomTile(int x, int y) {
@@ -705,6 +814,13 @@ public class DungeonGenerator {
         return false;
     }
 
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
 
     public int getRoomCount() {
         return rooms.size();
