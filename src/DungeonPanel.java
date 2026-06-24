@@ -19,7 +19,9 @@ public class DungeonPanel extends JPanel {
     }
 
     public void setTheme(DungeonTheme theme) {
-        this.theme = theme;
+        if (theme != null) {
+            this.theme = theme;
+        }
         repaint();
     }
 
@@ -71,11 +73,12 @@ public class DungeonPanel extends JPanel {
 
                 if (tileIndex > revealedTiles) {
                     g.setColor(Color.BLACK);
-                } else {
-                    TileType tile = map[y][x];
-                    g.setColor(TileColorHelper.getColor(tile, dungeon, x, y, theme));
+                    g.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    continue;
                 }
 
+                TileType tile = map[y][x];
+                g.setColor(TileColorHelper.getColor(tile, dungeon, x, y, theme));
                 g.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
 
                 g.setColor(new Color(0, 0, 0, 90));

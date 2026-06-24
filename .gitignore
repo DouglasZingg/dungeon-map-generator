@@ -24,3 +24,14 @@ hs_err_pid*
 replay_pid*
 
 .vs
+
+build/
+dist/
+
+*.class
+*.jar
+
+.vs/
+.idea/
+
+Thumbs.db

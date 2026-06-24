@@ -4,6 +4,9 @@ public class Room {
     public int width;
     public int height;
     public RoomType type = RoomType.COMBAT;
+    public RoomShape shape = RoomShape.RECTANGLE;
+    public int shapeVariant = 0;
+    public RoomPathRole pathRole = RoomPathRole.SIDE_PATH;
 
     public Room(int x, int y, int width, int height) {
         this.x = x;

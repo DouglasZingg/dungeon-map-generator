@@ -22,6 +22,7 @@ public class DungeonSettings {
 
     public int maxGenerationAttempts = 50;
 
+
     public int combatRoomChance = 60;
     public int treasureRoomChance = 25;
     public int trapRoomChance = 15;
@@ -29,4 +30,12 @@ public class DungeonSettings {
     // New packed algorithm tuning.
     public int extraConnectionChance = 35;
     public int extraConnectionMaxDistance = 10;
+
+    // Path layout tuning.
+    // Higher mainPathPercent makes the critical route longer.
+    // Higher deadEndChance creates more one-room side branches.
+    public int mainPathPercent = 45;
+    public int minMainPathRooms = 4;
+    public int sideBranchMaxLength = 3;
+    public int deadEndChance = 65;
 }

@@ -1,8 +1,7 @@
 public enum MapSizePreset {
-    SMALL_24x36("24 x 36", 24, 36, 14),
-    MEDIUM_36x48("36 x 48", 36, 48, 30),
     SMALL_14x28("14 x 28", 14, 28, 8),
-    CUSTOM("Custom", 0, 0, 22);
+    SMALL_24x36("24 x 36", 24, 36, 14),
+    MEDIUM_36x48("36 x 48", 36, 48, 30);
 
     private final String label;
     private final int width;
@@ -26,10 +25,6 @@ public enum MapSizePreset {
 
     public int getRecommendedRooms() {
         return recommendedRooms;
-    }
-
-    public boolean isCustom() {
-        return this == CUSTOM;
     }
 
     @Override
