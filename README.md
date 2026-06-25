@@ -13,3 +13,5 @@ A procedural dungeon generation tool written in Java Swing.
 - PNG export
 - Random seed generation
 - Interactive editor
+
+To build a exe please run build-windows.bat and run the exe in the dist/DungeonGenerator folder

@@ -6,6 +6,13 @@ import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 
+// This is the main generation engine.
+// The UI collects settings, then this class builds the actual tile map.
+// The rough flow is:
+// 1. Split the map into packed areas.
+// 2. Carve rooms inside those areas.
+// 3. Connect rooms into a main path, side paths, and dead ends.
+// 4. Place doors, special rooms, entities, and validation markers.
 public class DungeonGenerator {
     private final int width;
     private final int height;
@@ -16,6 +23,8 @@ public class DungeonGenerator {
     private final DungeonSettings settings;
     private final Set<String> connectedRoomPairs = new HashSet<>();
 
+    // A temporary rectangle used by the packed/BSP-style room placement.
+    // These are not rooms yet; they are just chunks of available map space.
     private static class Area {
         int x;
         int y;
@@ -43,6 +52,9 @@ public class DungeonGenerator {
         this.random = new Random(settings.seed);
     }
 
+    // Try a few times because procedural generation can occasionally make
+    // an awkward layout. If a generated map is not reachable, we throw it
+    // away and try again with the same seed stream.
     public void generate() {
         for (int attempt = 1; attempt <= settings.maxGenerationAttempts; attempt++) {
             rooms.clear();
@@ -66,6 +78,8 @@ public class DungeonGenerator {
         System.out.println("Warning: Could not generate a fully valid dungeon.");
     }
 
+    // Always start from a solid block of walls. Every room and hallway
+    // carves floor tiles out of this grid.
     private void fillMapWithWalls() {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
@@ -74,6 +88,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Splits the map into leaf areas, then places one room inside each leaf.
+    // This creates a fuller, battle-map style layout without huge empty gaps.
     private void placePackedRooms(int targetRooms) {
         List<Area> leaves = new ArrayList<>();
         leaves.add(new Area(1, 1, width - 2, height - 2));
@@ -106,6 +122,8 @@ public class DungeonGenerator {
         return area.width >= minLeafWidth * 2 || area.height >= minLeafHeight * 2;
     }
 
+    // Split the biggest available area either vertically or horizontally.
+    // The aspect-ratio checks help avoid long skinny slices.
     private void splitArea(Area area, List<Area> leaves) {
         int minLeafWidth = settings.minRoomWidth + 2;
         int minLeafHeight = settings.minRoomHeight + 2;
@@ -139,6 +157,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Turns one leaf area into an actual room. The room is usually slightly
+    // smaller than the leaf so neighboring rooms do not touch directly.
     private Room createRoomFromArea(Area area) {
         // Keep a one-tile buffer inside each BSP leaf when possible.
         // This prevents rooms from visually merging/colliding when two leaves touch.
@@ -180,6 +200,8 @@ public class DungeonGenerator {
         return room;
     }
 
+    // Pick a room shape. Rectangles are still the most common because they
+    // are reliable, while L/T/cross rooms add some handcrafted-looking variety.
     private void assignRoomShape(Room room) {
         // Very small rooms stay rectangular so doors and entities have reliable floor space.
         if (room.width < 7 || room.height < 7) {
@@ -219,6 +241,8 @@ public class DungeonGenerator {
                 && a.y + a.height + padding > b.y;
     }
 
+    // Carving only changes selected tiles to FLOOR. The room object still keeps
+    // its full bounding box, which keeps collision and door logic simpler.
     private void carveRoom(Room room) {
         switch (room.shape) {
             case L_SHAPE:
@@ -314,6 +338,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Build the dungeon graph: one main path, then side branches and a few loops.
+    // The hallway carving itself is handled later by connectTwoRooms().
     private void connectRoomsPacked() {
         if (rooms.size() < 2) {
             return;
@@ -330,6 +356,8 @@ public class DungeonGenerator {
         addOptionalLoops();
     }
 
+    // Choose a start room near the top-left and an exit room far away from it.
+    // Rooms between them become the critical path through the dungeon.
     private void buildMainPath() {
         mainPathRooms.clear();
 
@@ -431,6 +459,8 @@ public class DungeonGenerator {
         return ((px - ax) * vx + (py - ay) * vy) / lengthSquared;
     }
 
+    // Attach non-main rooms onto the critical path as optional branches.
+    // Some branch endings are intentionally marked as dead ends for rewards/traps.
     private void connectSidePathsAndDeadEnds() {
         List<Room> unconnectedSideRooms = new ArrayList<>();
 
@@ -480,6 +510,8 @@ public class DungeonGenerator {
         return nearest;
     }
 
+    // Optional loops make the dungeon less linear. They are kept short so the
+    // map still reads clearly.
     private void addOptionalLoops() {
         // A small number of short loops keeps maps from feeling too linear.
         for (int i = 0; i < rooms.size(); i++) {
@@ -494,21 +526,6 @@ public class DungeonGenerator {
         }
     }
 
-    private Room findNearestPreviousRoom(Room room, int previousRoomCount) {
-        Room nearestRoom = rooms.get(0);
-        int nearestDistance = Integer.MAX_VALUE;
-
-        for (int i = 0; i < previousRoomCount; i++) {
-            Room candidate = rooms.get(i);
-            int distance = edgeDistance(room, candidate);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestRoom = candidate;
-            }
-        }
-
-        return nearestRoom;
-    }
 
     private Room findNearestRoom(Room room, int roomIndex) {
         Room nearestRoom = null;
@@ -536,6 +553,8 @@ public class DungeonGenerator {
         return horizontalGap + verticalGap;
     }
 
+    // Connect two rooms once. This places doors at the room edges and asks the
+    // pathfinder to carve a one-tile-wide hallway between them.
     private void connectTwoRooms(Room roomA, Room roomB) {
         int indexA = rooms.indexOf(roomA);
         int indexB = rooms.indexOf(roomB);
@@ -555,6 +574,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Door coordinates live on room floors. Start/end coordinates live just
+    // outside the rooms, where the hallway is allowed to begin/end.
     private static class ConnectionPoints {
         int doorAX;
         int doorAY;
@@ -566,6 +587,8 @@ public class DungeonGenerator {
         int endY;
     }
 
+    // Pick the best door sides based on room positions. Horizontal connections
+    // prefer left/right doors; vertical connections prefer top/bottom doors.
     private ConnectionPoints getConnectionPoints(Room a, Room b) {
         ConnectionPoints points = new ConnectionPoints();
 
@@ -676,6 +699,8 @@ public class DungeonGenerator {
         return Math.max(min, Math.min(max, value));
     }
 
+    // Door placement is intentionally conservative. A door only appears when
+    // it sits on carved room floor and touches a hallway outside the room.
     private void placeDoor(int x, int y) {
         if (!isInsideMap(x, y)) {
             return;
@@ -731,6 +756,7 @@ public class DungeonGenerator {
     }
 
 
+    // Small node class used by the hallway pathfinder priority queue.
     private static class PathNode implements Comparable<PathNode> {
         int x;
         int y;
@@ -748,6 +774,8 @@ public class DungeonGenerator {
         }
     }
 
+    // A* hallway routing. This is what keeps corridors from cutting straight
+    // through rooms when the packed layout gets crowded.
     private void carveHallwayPath(int startX, int startY, int endX, int endY) {
         if (!isInsideMap(startX, startY) || !isInsideMap(endX, endY)) {
             return;
@@ -880,6 +908,8 @@ public class DungeonGenerator {
         }
     }
 
+    // The one rule for hallway carving: only carve outside room interiors.
+    // This keeps rooms readable and prevents weird doubled-up room/hallway tiles.
     private void carveFloor(int x, int y) {
         if (!isInsideMap(x, y)) {
             return;
@@ -894,74 +924,12 @@ public class DungeonGenerator {
         map[y][x] = TileType.FLOOR;
     }
 
-    private void thinRedundantHallways() {
-        // Removes accidental 2-tile-wide hallway strips caused by nearby branch connections.
-        // Only touches plain hallway floor outside rooms and avoids door-adjacent tiles.
-        boolean changed;
-        int pass = 0;
 
-        do {
-            changed = false;
-            pass++;
 
-            for (int y = 1; y < height - 1; y++) {
-                for (int x = 1; x < width - 1; x++) {
-                    if (!isRemovableHallwayFloor(x, y)) {
-                        continue;
-                    }
 
-                    boolean horizontalDouble = isHallwayFloor(x, y - 1)
-                            && isHallwayFloor(x - 1, y)
-                            && isHallwayFloor(x + 1, y)
-                            && isHallwayFloor(x - 1, y - 1)
-                            && isHallwayFloor(x + 1, y - 1);
 
-                    boolean verticalDouble = isHallwayFloor(x - 1, y)
-                            && isHallwayFloor(x, y - 1)
-                            && isHallwayFloor(x, y + 1)
-                            && isHallwayFloor(x - 1, y - 1)
-                            && isHallwayFloor(x - 1, y + 1);
-
-                    if (horizontalDouble || verticalDouble) {
-                        map[y][x] = TileType.WALL;
-                        changed = true;
-                    }
-                }
-            }
-        } while (changed && pass < 3);
-    }
-
-    private boolean isRemovableHallwayFloor(int x, int y) {
-        return isHallwayFloor(x, y)
-                && !touchesAnyRoom(x, y)
-                && !touchesAnyDoor(x, y);
-    }
-
-    private boolean isHallwayFloor(int x, int y) {
-        return isInsideMap(x, y)
-                && map[y][x] == TileType.FLOOR
-                && !isInsideAnyRoom(x, y);
-    }
-
-    private boolean touchesAnyDoor(int x, int y) {
-        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
-            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
-                if (!isInsideMap(checkX, checkY)) {
-                    continue;
-                }
-
-                TileType tile = map[checkY][checkX];
-                if (tile == TileType.DOOR
-                        || tile == TileType.LOCKED_DOOR
-                        || tile == TileType.SECRET_DOOR) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
+    // Uses the room bounding boxes, not just carved floor. This is stricter,
+    // but it helps keep hallways outside shaped rooms too.
     private boolean isInsideAnyRoom(int x, int y) {
         for (Room room : rooms) {
             if (x >= room.x
@@ -981,6 +949,8 @@ public class DungeonGenerator {
                 || isCarvedRoomTile(x, y - 1);
     }
 
+    // Checks whether a tile belongs to the actual carved shape of any room.
+    // This matters for L/T/cross rooms, where not every bounding-box tile is floor.
     private boolean isCarvedRoomTile(int x, int y) {
         for (Room room : rooms) {
             if (isCarvedRoomTile(x, y, room)) {
@@ -1014,6 +984,8 @@ public class DungeonGenerator {
                 || tile == TileType.POTION;
     }
 
+    // The boss room gets one locked door when possible, and a key is placed
+    // somewhere earlier in the dungeon.
     private void placeLockedDoorAndKey() {
         Room bossRoom = findRoomByType(RoomType.BOSS);
 
@@ -1053,6 +1025,8 @@ public class DungeonGenerator {
         placeRandomTileInRoom(keyRoom, TileType.KEY);
     }
 
+    // Important markers are placed last so they do not get overwritten by
+    // room population.
     private void placePlayerAndExit() {
         Room startRoom = findRoomByType(RoomType.START);
         Room exitRoom = findRoomByType(RoomType.EXIT);
@@ -1090,6 +1064,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Fill rooms based on their type. This keeps gameplay intent separate from
+    // layout generation.
     private void populateRooms() {
         for (Room room : rooms) {
             if (room.type == RoomType.COMBAT) {
@@ -1150,6 +1126,8 @@ public class DungeonGenerator {
         map[position[1]][position[0]] = tile;
     }
 
+    // Assign gameplay roles after the room graph exists. The main path gives us
+    // a natural start, boss, and exit; side/dead-end rooms get varied content.
     private void assignRoomTypes() {
         if (rooms.isEmpty()) {
             return;
@@ -1207,6 +1185,8 @@ public class DungeonGenerator {
         }
     }
 
+    // Secret rooms are optional. If the map is too packed, we simply skip it
+    // instead of forcing a bad room placement.
     private void createSecretRoom() {
         int roomWidth = 5;
         int roomHeight = 5;
@@ -1262,6 +1242,7 @@ public class DungeonGenerator {
         }
     }
 
+    // Final sanity check. A good map must let the player reach the exit.
     public boolean isExitReachable() {
         int startX = -1;
         int startY = -1;
@@ -1299,6 +1280,8 @@ public class DungeonGenerator {
         return TileType.EXIT;
     }
 
+    // Simple recursive flood fill. The maps are small enough that this is easy
+    // to read and safe for the current project sizes.
     private boolean floodFill(int x, int y, int exitX, int exitY, boolean[][] visited) {
         if (!isInsideMap(x, y)) {
             return false;
@@ -1353,6 +1336,7 @@ public class DungeonGenerator {
         return x >= 0 && x < width && y >= 0 && y < height;
     }
 
+    // Useful for debugging or exporting a quick text version of the dungeon.
     public String getMapAsString() {
         StringBuilder builder = new StringBuilder();
 
@@ -1367,65 +1351,10 @@ public class DungeonGenerator {
     }
 
 
-    public int[] findFirstTile(TileType tileType) {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (map[y][x] == tileType) {
-                    return new int[] { x, y };
-                }
-            }
-        }
-        return null;
-    }
 
-    public void clearTile(TileType tileType) {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (map[y][x] == tileType) {
-                    map[y][x] = TileType.FLOOR;
-                }
-            }
-        }
-    }
 
-    public boolean placeTileAtOrNear(int targetX, int targetY, TileType tileType) {
-        clearTile(tileType);
-
-        int bestX = -1;
-        int bestY = -1;
-        int bestDistance = Integer.MAX_VALUE;
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (!canPlaceImportantTileOn(map[y][x])) {
-                    continue;
-                }
-
-                int distance = Math.abs(x - targetX) + Math.abs(y - targetY);
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestX = x;
-                    bestY = y;
-                }
-            }
-        }
-
-        if (bestX == -1) {
-            return false;
-        }
-
-        map[bestY][bestX] = tileType;
-        return true;
-    }
-
-    private boolean canPlaceImportantTileOn(TileType tileType) {
-        return tileType == TileType.FLOOR
-                || tileType == TileType.ENEMY
-                || tileType == TileType.TREASURE
-                || tileType == TileType.TRAP
-                || tileType == TileType.POTION
-                || tileType == TileType.KEY;
-    }
+    // The renderer reads the tile map directly. For a small project, this keeps
+    // the code simple; larger projects might return a defensive copy instead.
     public TileType[][] getMap() {
         return map;
     }

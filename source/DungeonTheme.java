@@ -1,3 +1,5 @@
+// Color palettes for the map renderer.
+// Add a new enum value here if you want another visual theme later.
 import java.awt.Color;
 
 public enum DungeonTheme {

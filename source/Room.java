@@ -1,3 +1,5 @@
+// Lightweight room data.
+// The generator mutates these fields while deciding shape, type, and path role.
 public class Room {
     public int x;
     public int y;
@@ -15,6 +17,7 @@ public class Room {
         this.height = height;
     }
 
+    // Center is used for path sorting and rough distance checks.
     public int centerX() {
         return x + width / 2;
     }
@@ -23,6 +26,8 @@ public class Room {
         return y + height / 2;
     }
 
+    // Basic bounding-box overlap check. Shaped rooms still use their full box
+    // for collision because it keeps placement stable and easier to reason about.
     public boolean intersects(Room other) {
         return x < other.x + other.width &&
                x + width > other.x &&

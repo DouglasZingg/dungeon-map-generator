@@ -1,5 +1,7 @@
 import java.awt.Color;
 
+// One shared place for tile colors.
+// This keeps the Swing preview and PNG export from drifting out of sync.
 public class TileColorHelper {
     public static Color getColor(TileType tile, DungeonGenerator dungeon, int x, int y, DungeonTheme theme) {
         switch (tile) {

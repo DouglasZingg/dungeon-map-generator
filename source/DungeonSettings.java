@@ -1,3 +1,6 @@
+// Tweakable values for the generator.
+// The UI edits these before creating a new DungeonGenerator.
+// Keeping them here makes balancing the dungeon much easier than hunting through the algorithm.
 public class DungeonSettings {
     // Packed-room defaults create a fuller, battle-map style layout.
     public int maxRooms = 22;
@@ -18,6 +21,8 @@ public class DungeonSettings {
     public int minTrapsPerTrapRoom = 1;
     public int maxTrapsPerTrapRoom = 3;
 
+    // Seed controls repeatability. Generate Dungeon replaces this with a fresh seed;
+    // Regenerate From Seed reuses the current value.
     public long seed = System.currentTimeMillis();
 
     public int maxGenerationAttempts = 50;

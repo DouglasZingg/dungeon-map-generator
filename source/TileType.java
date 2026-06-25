@@ -1,3 +1,5 @@
+// Every tile that can appear on the map.
+// The character symbols are mostly for text/debug export; the UI renders colors.
 public enum TileType {
     WALL('#'),
     FLOOR('.'),

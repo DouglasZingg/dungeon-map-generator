@@ -4,6 +4,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 
+// Custom drawing panel for the dungeon map.
+// The viewer passes in a DungeonGenerator, and this panel paints each tile as a colored square.
 public class DungeonPanel extends JPanel {
     private DungeonGenerator dungeon;
     private DungeonTheme theme = DungeonTheme.CLASSIC;
@@ -11,6 +13,8 @@ public class DungeonPanel extends JPanel {
     private int revealedTiles = Integer.MAX_VALUE;
     private Timer animationTimer;
 
+    // Called whenever a new dungeon is generated.
+    // We also reset the reveal state so normal redraws show the whole map.
     public void setDungeon(DungeonGenerator dungeon) {
         this.dungeon = dungeon;
         this.revealedTiles = Integer.MAX_VALUE;
@@ -29,6 +33,8 @@ public class DungeonPanel extends JPanel {
         return theme;
     }
 
+    // Simple reveal animation used when Generate Dungeon is pressed.
+    // It does not change the map; it only controls how much of it is drawn.
     public void startRevealAnimation() {
         if (dungeon == null) {
             return;
@@ -58,6 +64,8 @@ public class DungeonPanel extends JPanel {
     }
 
     @Override
+    // Swing calls this whenever the map needs to redraw.
+    // Keep this method drawing-only so generation stays inside DungeonGenerator.
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
@@ -97,6 +105,7 @@ public class DungeonPanel extends JPanel {
         return tileSize;
     }
 
+    // Match the panel size to the current dungeon and zoom level so scrollbars work correctly.
     private void updatePreferredSize() {
         if (dungeon == null) {
             return;

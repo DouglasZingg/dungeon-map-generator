@@ -23,7 +23,10 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.net.URL;
 
+// Main Swing window.
+// This class owns the controls, passes settings to the generator, and asks DungeonPanel to draw the result.
 public class DungeonViewer extends JFrame {
     private final DungeonSettings settings;
     private DungeonGenerator dungeon;
@@ -43,11 +46,13 @@ public class DungeonViewer extends JFrame {
     private final JLabel statusLabel;
     private JPanel legendPanel;
 
+    // Set up the window once, then generate an initial map so the app opens with something visible.
     public DungeonViewer() {
         settings = new DungeonSettings();
         dungeonPanel = new DungeonPanel();
 
         setTitle("Dungeon Map Generator - Single Floor Editor");
+        applyWindowIcon();
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(1100, 720));
         setExtendedState(JFrame.MAXIMIZED_BOTH);
@@ -80,6 +85,18 @@ public class DungeonViewer extends JFrame {
         generateDungeon(false, true);
     }
 
+
+    // Loads icon.png from the JAR/resources if it exists.
+    // If it is missing, the app still runs with the default Java icon.
+    private void applyWindowIcon() {
+        URL iconUrl = getClass().getResource("/icon.png");
+
+        if (iconUrl != null) {
+            setIconImage(new javax.swing.ImageIcon(iconUrl).getImage());
+        }
+    }
+
+    // Top title area. Kept separate so the main layout code stays easier to scan.
     private JPanel createHeaderPanel() {
         JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setBorder(BorderFactory.createEmptyBorder(10, 12, 6, 12));
@@ -99,6 +116,7 @@ public class DungeonViewer extends JFrame {
         return header;
     }
 
+    // Center area: legend on top, scrollable map underneath.
     private JPanel createMapAreaPanel() {
         JPanel mapArea = new JPanel(new BorderLayout(8, 8));
         mapArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -112,6 +130,7 @@ public class DungeonViewer extends JFrame {
         return mapArea;
     }
 
+    // Left-side settings panel. It is scrollable in case the app window is smaller.
     private JScrollPane createControlPanel() {
         JPanel leftPanel = new JPanel();
         leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
@@ -220,6 +239,8 @@ public class DungeonViewer extends JFrame {
         return panel;
     }
 
+    // UI events are intentionally small: update a control, then wait for the user
+    // to press Generate unless it is purely visual like zoom/theme.
     private void registerListeners() {
         mapSizeComboBox.addActionListener(e -> applyMapSizePreset());
         zoomSlider.addChangeListener(e -> dungeonPanel.setTileSize(zoomSlider.getValue()));
@@ -240,6 +261,8 @@ public class DungeonViewer extends JFrame {
         statusLabel.setText("Map size selected: " + preset + ". Press Generate Dungeon to apply.");
     }
 
+    // Pull values from the UI, create a generator, then show the result.
+    // createNewSeed=true gives a fresh dungeon while keeping the selected settings.
     private void generateDungeon(boolean animate, boolean createNewSeed) {
         settings.maxRooms = getSpinnerInt(roomCountSpinner);
         settings.seed = createNewSeed ? System.currentTimeMillis() : getSpinnerLong(seedSpinner);
@@ -276,6 +299,7 @@ public class DungeonViewer extends JFrame {
         return ((Number) spinner.getValue()).longValue();
     }
 
+    // One-line summary at the bottom. Useful for quickly checking the seed and validation.
     private void updateStatus() {
         if (dungeon == null) {
             statusLabel.setText("Ready");
@@ -291,6 +315,7 @@ public class DungeonViewer extends JFrame {
         );
     }
 
+    // The legend only shows gameplay/object colors. Floor/wall colors are obvious in the map.
     private JPanel createTopLegendPanel() {
         legendPanel = new JPanel(new GridLayout(0, 7, 8, 3));
         legendPanel.setBorder(BorderFactory.createTitledBorder("Legend"));
@@ -325,6 +350,7 @@ public class DungeonViewer extends JFrame {
         legendPanel.repaint();
     }
 
+    // Small colored square plus label. No symbols here so it matches the color-only map.
     private JPanel createLegendItem(String label, Color color) {
         JPanel item = new JPanel(new BorderLayout(4, 0));
         item.setOpaque(false);
@@ -343,6 +369,7 @@ public class DungeonViewer extends JFrame {
         return item;
     }
 
+    // Save the current map view to PNG using the same colors as the on-screen renderer.
     private void exportDungeonImage() {
         if (dungeon == null) {
             return;

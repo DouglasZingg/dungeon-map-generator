@@ -1,3 +1,5 @@
+// Fixed map sizes available in the UI.
+// Each preset also recommends a room count that tends to fit that canvas.
 public enum MapSizePreset {
     SMALL_14x28("14 x 28", 14, 28, 8),
     SMALL_24x36("24 x 36", 24, 36, 14),
